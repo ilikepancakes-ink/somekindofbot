@@ -1,4 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -32,6 +34,13 @@ module.exports = {
     try {
       await target.timeout(duration * 60 * 1000, reason);
       await interaction.reply(`${target.user.username} has been timed out for ${duration} minutes. Reason: ${reason}`);
+
+      // Log the timeout in CET
+      const logsDir = join(__dirname, '../../logs');
+      await fs.mkdir(logsDir, { recursive: true });
+      const timestamp = new Date().toLocaleString('en-GB', { timeZone: 'CET' });
+      const logEntry = `[${timestamp}] User ${target.user.tag} timed out for ${duration} minutes in ${interaction.guild.name} by ${interaction.user.tag}. Reason: ${reason}\n`;
+      await fs.appendFile(join(logsDir, 'timeouts.log'), logEntry);
     } catch (error) {
       console.error(error);
       await interaction.reply({ content: 'Failed to timeout the user.', ephemeral: true });
