@@ -1,4 +1,5 @@
-import { Events } from 'discord.js';
+import { Events, EmbedBuilder } from 'discord.js';
+import { rule34Data } from '../commands/nsfw/rule34';
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -22,8 +23,36 @@ module.exports = {
         }
       }
     } else if (interaction.isButton()) {
-      // Handle button interactions (for help command pagination)
-      // The help command handles its own button interactions
+      if (interaction.customId.startsWith('rule34_')) {
+        const parts = interaction.customId.split('_');
+        const action = parts[1];
+        const id = parts[2];
+        const data = rule34Data.get(id);
+        if (!data) {
+          return await interaction.reply({ content: 'Data not found.', flags: 64 });
+        }
+        const { posts, currentIndex } = data;
+        let newIndex = currentIndex;
+        if (action === 'prev') {
+          newIndex = (currentIndex - 1 + posts.length) % posts.length;
+        } else if (action === 'next') {
+          newIndex = (currentIndex + 1) % posts.length;
+        } else if (action === 'refresh') {
+          newIndex = Math.floor(Math.random() * posts.length);
+        }
+        data.currentIndex = newIndex;
+        const post = posts[newIndex];
+        const tagsStr = post.tags ? post.tags.split(' ').slice(0, 10).join(' ') : 'N/A';
+        const embed = new EmbedBuilder()
+          .setTitle(`Rule 34 - Browse (${newIndex + 1}/${posts.length})`)
+          .setDescription(`Tags: ${tagsStr}`)
+          .setImage(post.file_url)
+          .setFooter({ text: `Post ID: ${post.id}` });
+        await interaction.update({ embeds: [embed] });
+      } else {
+        // Handle button interactions (for help command pagination)
+        // The help command handles its own button interactions
+      }
     }
   },
 };

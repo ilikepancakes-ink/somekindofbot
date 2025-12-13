@@ -1,5 +1,7 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import axios from 'axios';
+
+export const rule34Data = new Map<string, { posts: any[], currentIndex: number }>();
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -11,12 +13,6 @@ module.exports = {
         .setDescription('Browse Rule 34 posts by tags')
         .addStringOption(option =>
           option.setName('tags').setDescription('Tags to search for').setRequired(true)
-        )
-        .addIntegerOption(option =>
-          option.setName('page').setDescription('Page number (default: 0)').setRequired(false)
-        )
-        .addIntegerOption(option =>
-          option.setName('limit').setDescription('Number of posts (max: 100)').setRequired(false)
         )
         .addBooleanOption(option =>
           option.setName('ai_content').setDescription('Include AI-generated content (default: false)').setRequired(false)
@@ -74,10 +70,8 @@ module.exports = {
 
       if (subcommand === 'browse') {
         const tags = interaction.options.getString('tags');
-        const page = interaction.options.getInteger('page') || 0;
-        const limit = Math.min(interaction.options.getInteger('limit') || 10, 100);
 
-        url += `&tags=${encodeURIComponent(tags)}&pid=${page}&limit=${limit}`;
+        url += `&tags=${encodeURIComponent(tags)}&limit=150`;
       } else if (subcommand === 'random') {
         const tags = interaction.options.getString('tags') || '';
         // For random, get a high limit and pick one randomly, or use a random pid
@@ -124,16 +118,35 @@ module.exports = {
 
         await interaction.reply({ embeds: [embed] });
       } else if (subcommand === 'browse') {
-        const embeds = filteredPosts.slice(0, 10).map((post: any) => {
-          const tags = post.tags ? post.tags.split(' ').slice(0, 10).join(' ') : 'N/A';
-          return new EmbedBuilder()
-            .setTitle(`Post ${post.id}`)
-            .setDescription(`Tags: ${tags}`)
-            .setImage(post.file_url)
-            .setURL(`https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`);
-        });
+        const randomIndex = Math.floor(Math.random() * filteredPosts.length);
+        rule34Data.set(interaction.id, { posts: filteredPosts, currentIndex: randomIndex });
+        const post = filteredPosts[randomIndex];
+        const tagsStr = post.tags ? post.tags.split(' ').slice(0, 10).join(' ') : 'N/A';
+        const embed = new EmbedBuilder()
+          .setTitle(`Rule 34 - Browse (${randomIndex + 1}/${filteredPosts.length})`)
+          .setDescription(`Tags: ${tagsStr}`)
+          .setImage(post.file_url)
+          .setFooter({ text: `Post ID: ${post.id}` });
 
-        await interaction.reply({ embeds });
+        const prevButton = new ButtonBuilder()
+          .setCustomId(`rule34_prev_${interaction.id}`)
+          .setLabel('Prev')
+          .setStyle(ButtonStyle.Secondary);
+
+        const nextButton = new ButtonBuilder()
+          .setCustomId(`rule34_next_${interaction.id}`)
+          .setLabel('Next')
+          .setStyle(ButtonStyle.Secondary);
+
+        const refreshButton = new ButtonBuilder()
+          .setCustomId(`rule34_refresh_${interaction.id}`)
+          .setLabel('Refresh')
+          .setStyle(ButtonStyle.Primary);
+
+        const row = new ActionRowBuilder<ButtonBuilder>()
+          .addComponents(prevButton, nextButton, refreshButton);
+
+        await interaction.reply({ embeds: [embed], components: [row] });
       } else if (subcommand === 'top100') {
         // For top100, just send the first 10 as embeds, and mention there are more
         const embeds = filteredPosts.slice(0, 10).map((post: any, index: number) => {
