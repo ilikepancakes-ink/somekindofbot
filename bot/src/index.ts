@@ -32,6 +32,8 @@ for (const folder of commandFolders) {
     const command = require(filePath);
 
     if (command.data && command.execute) {
+      // Store the group (folder name) with the command
+      command.group = folder;
       (client as any).commands.set(command.data.name, command);
     } else {
       console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
