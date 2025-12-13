@@ -10,11 +10,12 @@ module.exports = {
   async execute(interaction: any) {
     await interaction.deferReply({ ephemeral: true });
 
-    if (!process.env.BOT_ADMIN_USER_ID) {
+    const adminId = process.env.BOT_ADMIN_USER_ID?.trim();
+    if (!adminId) {
       return interaction.editReply({ content: 'BOT_ADMIN_USER_ID environment variable is not set.' });
     }
 
-    if (interaction.user.id !== process.env.BOT_ADMIN_USER_ID) {
+    if (interaction.user.id !== adminId) {
       return interaction.editReply({ content: 'You do not have permission to use this command.' });
     }
 
