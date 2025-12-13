@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, InteractionReplyOptions } from 'discord.js';
 import axios from 'axios';
 
 module.exports = {
@@ -8,13 +8,13 @@ module.exports = {
 
   async execute(interaction: any) {
     try {
-      const response = await axios.get('https://v2.jokeapi.dev/joke/Any&type=single');
+      const response = await axios.get('https://v2.jokeapi.dev/joke/Any?type=single');
       const joke = response.data.joke;
 
       await interaction.reply(joke);
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Failed to fetch a joke. Try again later!', ephemeral: true });
+      await interaction.reply({ content: 'Failed to fetch a joke. Try again later!', flags: 64 }); // 64 is ephemeral flag
     }
   },
 };

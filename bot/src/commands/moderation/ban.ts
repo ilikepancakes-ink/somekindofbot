@@ -23,7 +23,7 @@ module.exports = {
       await interaction.reply(`${target.username} has been banned for: ${reason}`);
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Failed to ban the user.', ephemeral: true });
+      await interaction.reply({ content: 'Failed to ban the user.', flags: 64 });
     }
   },
 };

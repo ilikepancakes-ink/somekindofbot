@@ -28,7 +28,7 @@ module.exports = {
     const reason = interaction.options.getString('reason') || 'No reason provided';
 
     if (!target) {
-      return interaction.reply({ content: 'User not found in this server.', ephemeral: true });
+      return interaction.reply({ content: 'User not found in this server.', flags: 64 });
     }
 
     try {
@@ -43,7 +43,7 @@ module.exports = {
       await fs.appendFile(join(logsDir, 'timeouts.log'), logEntry);
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Failed to timeout the user.', ephemeral: true });
+      await interaction.reply({ content: 'Failed to timeout the user.', flags: 64 });
     }
   },
 };

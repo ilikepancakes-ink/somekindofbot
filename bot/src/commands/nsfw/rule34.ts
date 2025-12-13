@@ -41,7 +41,7 @@ module.exports = {
     if (!interaction.channel?.nsfw) {
       return await interaction.reply({
         content: 'This command can only be used in NSFW channels!',
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -52,7 +52,7 @@ module.exports = {
     if (!userId || !apiKey) {
       return await interaction.reply({
         content: 'Rule 34 API authentication not configured. Please set RULE34_USER_ID and RULE34_API_KEY in your environment variables.',
-        ephemeral: true
+        flags: 64
       });
     }
 
@@ -82,7 +82,7 @@ module.exports = {
       if (response.data?.length === 0) {
         return await interaction.reply({
           content: 'No posts found for the given tags.',
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -91,7 +91,7 @@ module.exports = {
       if (posts.length === 0) {
         return await interaction.reply({
           content: 'No posts found.',
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -134,7 +134,7 @@ module.exports = {
       console.error('Rule34 API Error:', error.response?.data || error.message);
       await interaction.reply({
         content: 'Failed to fetch data from Rule 34 API. Try again later!',
-        ephemeral: true
+        flags: 64
       });
     }
   },

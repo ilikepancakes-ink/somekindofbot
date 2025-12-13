@@ -23,7 +23,7 @@ module.exports = {
       await interaction.reply(`${target.username} has been kicked for: ${reason}`);
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Failed to kick the user.', ephemeral: true });
+      await interaction.reply({ content: 'Failed to kick the user.', flags: 64 });
     }
   },
 };
