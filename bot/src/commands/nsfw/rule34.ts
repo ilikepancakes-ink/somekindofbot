@@ -18,6 +18,9 @@ module.exports = {
         .addIntegerOption(option =>
           option.setName('limit').setDescription('Number of posts (max: 100)').setRequired(false)
         )
+        .addBooleanOption(option =>
+          option.setName('ai_content').setDescription('Include AI-generated content (default: false)').setRequired(false)
+        )
     )
     .addSubcommand(sub =>
       sub
@@ -26,6 +29,9 @@ module.exports = {
         .addStringOption(option =>
           option.setName('tags').setDescription('Tags to search for (optional)').setRequired(false)
         )
+        .addBooleanOption(option =>
+          option.setName('ai_content').setDescription('Include AI-generated content (default: false)').setRequired(false)
+        )
     )
     .addSubcommand(sub =>
       sub
@@ -33,6 +39,9 @@ module.exports = {
         .setDescription('Get top 100 Rule 34 posts')
         .addStringOption(option =>
           option.setName('tags').setDescription('Tags to search for (optional)').setRequired(false)
+        )
+        .addBooleanOption(option =>
+          option.setName('ai_content').setDescription('Include AI-generated content (default: false)').setRequired(false)
         )
     ),
 
@@ -61,6 +70,8 @@ module.exports = {
     try {
       let url = `https://api.rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&user_id=${userId}&api_key=${apiKey}`;
 
+      const aiContent = interaction.options.getBoolean('ai_content') || false;
+
       if (subcommand === 'browse') {
         const tags = interaction.options.getString('tags');
         const page = interaction.options.getInteger('page') || 0;
@@ -88,27 +99,36 @@ module.exports = {
 
       const posts = Array.isArray(response.data) ? response.data : [];
 
-      if (posts.length === 0) {
+      // Filter out AI-generated content unless ai_content is true
+      const filteredPosts = posts.filter((post: any) => {
+        if (aiContent) return true;
+        const tags = post.tags ? post.tags.split(' ') : [];
+        return !tags.includes('ai_generated');
+      });
+
+      if (filteredPosts.length === 0) {
         return await interaction.reply({
-          content: 'No posts found.',
+          content: 'No posts found (filtered out AI-generated content).',
           flags: 64
         });
       }
 
       if (subcommand === 'random') {
-        const post = posts[0];
+        const post = filteredPosts[0];
+        const tags = post.tags ? post.tags.split(' ').slice(0, 10).join(' ') : 'N/A';
         const embed = new EmbedBuilder()
           .setTitle(`Rule 34 - Random Post`)
-          .setDescription(`Tags: ${post.tags || 'N/A'}`)
+          .setDescription(`Tags: ${tags}`)
           .setImage(post.file_url)
           .setFooter({ text: `Post ID: ${post.id}` });
 
         await interaction.reply({ embeds: [embed] });
       } else if (subcommand === 'browse') {
-        const embeds = posts.slice(0, 10).map((post: any) => {
+        const embeds = filteredPosts.slice(0, 10).map((post: any) => {
+          const tags = post.tags ? post.tags.split(' ').slice(0, 10).join(' ') : 'N/A';
           return new EmbedBuilder()
             .setTitle(`Post ${post.id}`)
-            .setDescription(`Tags: ${post.tags?.substring(0, 100) || 'N/A'}`)
+            .setDescription(`Tags: ${tags}`)
             .setImage(post.file_url)
             .setURL(`https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`);
         });
@@ -116,16 +136,17 @@ module.exports = {
         await interaction.reply({ embeds });
       } else if (subcommand === 'top100') {
         // For top100, just send the first 10 as embeds, and mention there are more
-        const embeds = posts.slice(0, 10).map((post: any, index: number) => {
+        const embeds = filteredPosts.slice(0, 10).map((post: any, index: number) => {
+          const tags = post.tags ? post.tags.split(' ').slice(0, 10).join(' ') : 'N/A';
           return new EmbedBuilder()
             .setTitle(`Top ${index + 1} - Post ${post.id}`)
-            .setDescription(`Tags: ${post.tags?.substring(0, 100) || 'N/A'}`)
+            .setDescription(`Tags: ${tags}`)
             .setImage(post.file_url)
             .setURL(`https://rule34.xxx/index.php?page=post&s=view&id=${post.id}`);
         });
 
         await interaction.reply({
-          content: `Showing first 10 of ${posts.length} posts. Visit https://rule34.xxx for more.`,
+          content: `Showing first 10 of ${filteredPosts.length} posts. Visit https://rule34.xxx for more.`,
           embeds
         });
       }
