@@ -41,19 +41,29 @@ for (const folder of commandFolders) {
   }
 }
 
-// Load events
-const eventsPath = path.join(__dirname, 'events');
-const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.ts'));
+async function main() {
+  try {
+    // Load events
+    const eventsPath = path.join(__dirname, 'events');
+    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.ts'));
 
-for (const file of eventFiles) {
-  const filePath = path.join(eventsPath, file);
-  const event = require(filePath);
+    for (const file of eventFiles) {
+      const filePath = path.join(eventsPath, file);
+      const event = require(filePath);
 
-  if (event.once) {
-    client.once(event.name, (...args) => event.execute(...args));
-  } else {
-    client.on(event.name, (...args) => event.execute(...args));
+      if (event.once) {
+        client.once(event.name, (...args) => event.execute(...args));
+      } else {
+        client.on(event.name, (...args) => event.execute(...args));
+      }
+    }
+
+    await client.login(process.env.DISCORD_TOKEN);
+    console.log('Bot logged in successfully!');
+  } catch (error) {
+    console.error('Failed to login:', error);
+    process.exit(1);
   }
 }
 
-client.login(process.env.DISCORD_TOKEN);
+main();
