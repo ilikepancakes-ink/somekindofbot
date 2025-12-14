@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, ChannelType, GuildChannel } from 'discord.js';
 import * as path from 'path';
-const { getGuildStats, setGuildStats } = require(path.join(__dirname, '../database'));
+const { getGuildStats, setGuildStats } = require(path.join(__dirname, '../../database'));
 
 module.exports = {
   data: new SlashCommandBuilder()
