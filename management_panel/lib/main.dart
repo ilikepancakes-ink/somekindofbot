@@ -105,6 +105,14 @@ class _HomePageState extends State<HomePage> {
                       labelText: 'Auth Token',
                       hintText: 'Paste your auth token here',
                     ),
+                    enabled: true,
+                    readOnly: false,
+                    keyboardType: TextInputType.text,
+                    textInputAction: TextInputAction.done,
+                    autofocus: true,
+                    onChanged: (value) {
+                      print('Token input changed: ${value.length} characters');
+                    },
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
