@@ -1,4 +1,4 @@
-import { Events, EmbedBuilder } from 'discord.js';
+import { Events, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 import { rule34Data } from '../commands/nsfw/rule34';
 
 module.exports = {
@@ -48,7 +48,26 @@ module.exports = {
           .setDescription(`Tags: ${tagsStr}`)
           .setImage(post.file_url)
           .setFooter({ text: `Post ID: ${post.id}` });
-        await interaction.update({ embeds: [embed] });
+
+        const prevButton = new ButtonBuilder()
+          .setCustomId(`rule34_prev_${id}`)
+          .setLabel('Prev')
+          .setStyle(ButtonStyle.Secondary);
+
+        const nextButton = new ButtonBuilder()
+          .setCustomId(`rule34_next_${id}`)
+          .setLabel('Next')
+          .setStyle(ButtonStyle.Secondary);
+
+        const refreshButton = new ButtonBuilder()
+          .setCustomId(`rule34_refresh_${id}`)
+          .setLabel('Refresh')
+          .setStyle(ButtonStyle.Primary);
+
+        const row = new ActionRowBuilder<ButtonBuilder>()
+          .addComponents(prevButton, nextButton, refreshButton);
+
+        await interaction.update({ embeds: [embed], components: [row] });
       } else {
         // Handle button interactions (for help command pagination)
         // The help command handles its own button interactions
