@@ -35,15 +35,15 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!);
     if (!process.env.DISCORD_TOKEN) {
       throw new Error('DISCORD_TOKEN is not set in environment variables');
     }
-    if (!process.env.CLIENT_ID) {
-      throw new Error('CLIENT_ID is not set in environment variables');
+    if (!process.env.DISCORD_CLIENT_ID) {
+      throw new Error('DISCORD_CLIENT_ID is not set in environment variables');
     }
 
     console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
     // The put method is used to fully refresh all commands in the guild with the current set
     const data: any = await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
+      Routes.applicationCommands(process.env.DISCORD_CLIENT_ID!),
       { body: commands },
     );
 
