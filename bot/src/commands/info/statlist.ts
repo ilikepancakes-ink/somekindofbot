@@ -31,6 +31,9 @@ module.exports = {
         type: ChannelType.GuildCategory,
         position: 0
       });
+    } else {
+      // Ensure the category is at the top position
+      await category.setPosition(0);
     }
 
     // Calculate stats
@@ -56,7 +59,7 @@ module.exports = {
     // Create or update Days channel
     if (!stats.days_channel_id) {
       const channel = await guild.channels.create({
-        name: `Days: ${daysSince}`,
+        name: `Days Since Creation: ${daysSince}`,
         type: ChannelType.GuildVoice,
         parent: category.id,
         permissionOverwrites: [{ id: guild.id, deny: ['Connect'] }]
