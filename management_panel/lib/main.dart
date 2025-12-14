@@ -189,14 +189,28 @@ class _ManagementScreenState extends State<ManagementScreen> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Server switched to $serverId from Touch Bar')));
           break;
         case 'updateBot':
-          const baseUrl = 'https://discordbot.0x409.nl';
-          await http.post(Uri.parse('$baseUrl/api/update'), headers: {'Authorization': 'Bearer ${widget.token}'});
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updating from Touch Bar...')));
+          try {
+            const baseUrl = 'https://discordbot.0x409.nl';
+            await http.post(Uri.parse('$baseUrl/api/update'), headers: {'Authorization': 'Bearer ${widget.token}'});
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updating from Touch Bar...')));
+          } catch (e) {
+            print('❌ API Error in Touch Bar updateBot: $e');
+            print('   URL: https://discordbot.0x409.nl/api/update');
+            print('   Token: ${widget.token.substring(0, 20)}...');
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update bot from Touch Bar')));
+          }
           break;
         case 'restartBot':
-          const baseUrl = 'https://discordbot.0x409.nl';
-          await http.post(Uri.parse('$baseUrl/api/restart'), headers: {'Authorization': 'Bearer ${widget.token}'});
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Restarting from Touch Bar...')));
+          try {
+            const baseUrl = 'https://discordbot.0x409.nl';
+            await http.post(Uri.parse('$baseUrl/api/restart'), headers: {'Authorization': 'Bearer ${widget.token}'});
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Restarting from Touch Bar...')));
+          } catch (e) {
+            print('❌ API Error in Touch Bar restartBot: $e');
+            print('   URL: https://discordbot.0x409.nl/api/restart');
+            print('   Token: ${widget.token.substring(0, 20)}...');
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to restart bot from Touch Bar')));
+          }
           break;
       }
     });
@@ -228,7 +242,10 @@ class _ManagementScreenState extends State<ManagementScreen> {
 
       setState(() {});
     } catch (e) {
-      // Handle error
+      print('❌ API Error in _loadData: $e');
+      print('   URL: $baseUrl');
+      print('   Guild: $selectedServerId');
+      print('   Token: ${widget.token.substring(0, 20)}...');
     }
   }
 
@@ -236,12 +253,18 @@ class _ManagementScreenState extends State<ManagementScreen> {
     const baseUrl = 'https://discordbot.0x409.nl';
     final headers = {'Authorization': 'Bearer ${widget.token}'};
 
-    final res = await http.get(Uri.parse('$baseUrl/api/guilds'), headers: headers);
-    servers = List<Map<String, dynamic>>.from(jsonDecode(res.body));
-    if (servers.isNotEmpty) {
-      selectedServerId = servers[0]['id'];
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/guilds'), headers: headers);
+      servers = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+      if (servers.isNotEmpty) {
+        selectedServerId = servers[0]['id'];
+      }
+      setState(() {});
+    } catch (e) {
+      print('❌ API Error in _loadServers: $e');
+      print('   URL: $baseUrl/api/guilds');
+      print('   Token: ${widget.token.substring(0, 20)}...');
     }
-    setState(() {});
   }
 
   @override
@@ -357,15 +380,26 @@ class _ManagementScreenState extends State<ManagementScreen> {
           ),
           TextButton(
             onPressed: () async {
-              item['value'] = controller.text;
-              const baseUrl = 'https://discordbot.0x409.nl';
-              await http.post(
-                Uri.parse('$baseUrl/api/env'),
-                headers: {'Authorization': 'Bearer ${widget.token}', 'Content-Type': 'application/json'},
-                body: jsonEncode({'key': item['key'], 'value': item['value']}),
-              );
-              Navigator.pop(context);
-              _loadData();
+              try {
+                item['value'] = controller.text;
+                const baseUrl = 'https://discordbot.0x409.nl';
+                await http.post(
+                  Uri.parse('$baseUrl/api/env'),
+                  headers: {'Authorization': 'Bearer ${widget.token}', 'Content-Type': 'application/json'},
+                  body: jsonEncode({'key': item['key'], 'value': item['value']}),
+                );
+                Navigator.pop(context);
+                _loadData();
+              } catch (e) {
+                print('❌ API Error in _editEnv: $e');
+                print('   Key: ${item['key']}');
+                print('   URL: https://discordbot.0x409.nl/api/env');
+                print('   Token: ${widget.token.substring(0, 20)}...');
+                // Show error to user but don't close dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to save environment variable')),
+                );
+              }
             },
             child: const Text('Save'),
           ),
@@ -421,10 +455,19 @@ class _ManagementScreenState extends State<ManagementScreen> {
         children: [
           ElevatedButton(
             onPressed: () async {
-              const baseUrl = 'https://discordbot.0x409.nl';
-              await http.post(Uri.parse('$baseUrl/api/update'), headers: {'Authorization': 'Bearer ${widget.token}'});
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updating...')));
+              try {
+                const baseUrl = 'https://discordbot.0x409.nl';
+                await http.post(Uri.parse('$baseUrl/api/update'), headers: {'Authorization': 'Bearer ${widget.token}'});
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updating...')));
+                }
+              } catch (e) {
+                print('❌ API Error in _buildActions updateBot: $e');
+                print('   URL: https://discordbot.0x409.nl/api/update');
+                print('   Token: ${widget.token.substring(0, 20)}...');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update bot')));
+                }
               }
             },
             child: const Text('Update Bot'),
@@ -433,10 +476,19 @@ class _ManagementScreenState extends State<ManagementScreen> {
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () async {
-              const baseUrl = 'https://discordbot.0x409.nl';
-              await http.post(Uri.parse('$baseUrl/api/restart'), headers: {'Authorization': 'Bearer ${widget.token}'});
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Restarting...')));
+              try {
+                const baseUrl = 'https://discordbot.0x409.nl';
+                await http.post(Uri.parse('$baseUrl/api/restart'), headers: {'Authorization': 'Bearer ${widget.token}'});
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Restarting...')));
+                }
+              } catch (e) {
+                print('❌ API Error in _buildActions restartBot: $e');
+                print('   URL: https://discordbot.0x409.nl/api/restart');
+                print('   Token: ${widget.token.substring(0, 20)}...');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to restart bot')));
+                }
               }
             },
             child: const Text('Restart Bot'),
