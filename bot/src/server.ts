@@ -84,12 +84,26 @@ app.get('/validate', (req, res) => {
 // Endpoint for bot to generate auth tokens for admin users only
 app.post('/api/generate-token', (req, res) => {
   const { userId } = req.body;
+
+  // Detailed logging for server-side admin check
+  console.log(`🔐 Server Admin Check:`);
+  console.log(`   Received User ID: ${userId}`);
+  console.log(`   Server Admin ID: ${botAdminUserId || 'NOT SET'}`);
+  console.log(`   Server Match: ${userId === botAdminUserId ? '✅ YES' : '❌ NO'}`);
+
   if (!userId) {
+    console.error('❌ No user ID provided in request');
     return res.status(400).json({ error: 'User ID required' });
+  }
+
+  if (!botAdminUserId) {
+    console.error('❌ BOT_ADMIN_USER_ID not set on server');
+    return res.status(500).json({ error: 'Server configuration error: Admin user ID not configured' });
   }
 
   // Only allow token generation for the admin user
   if (userId !== botAdminUserId) {
+    console.warn(`🚫 Server rejected token generation for user ${userId}, expected ${botAdminUserId}`);
     return res.status(403).json({ error: 'Access denied. Only admin user can generate tokens.' });
   }
 
