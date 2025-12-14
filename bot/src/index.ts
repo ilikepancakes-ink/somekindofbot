@@ -2,10 +2,11 @@ import { Client, GatewayIntentBits, Collection, REST, Routes } from 'discord.js'
 import * as fs from 'fs';
 import * as path from 'path';
 import { config } from 'dotenv';
-import './server';
 
-// Load environment variables
+// Load environment variables FIRST
 config();
+
+import './server';
 
 const client = new Client({
   intents: [
