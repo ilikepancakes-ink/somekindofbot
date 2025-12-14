@@ -15,7 +15,11 @@ module.exports = {
       return;
     }
 
-    await interaction.deferReply();
+    try {
+      await interaction.deferReply();
+    } catch (error) {
+      // Ignore if interaction is expired
+    }
 
     // Get existing stats from DB
     let stats = await getGuildStats(guild.id);
@@ -101,6 +105,10 @@ module.exports = {
     // Save to DB
     await setGuildStats(stats);
 
-    await interaction.editReply({ content: 'Server stats channels created/updated successfully!' });
+    try {
+      await interaction.editReply({ content: 'Server stats channels created/updated successfully!' });
+    } catch (error) {
+      // Ignore if interaction is expired
+    }
   },
 };
