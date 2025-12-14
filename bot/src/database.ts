@@ -9,11 +9,21 @@ db.run(`
     member_channel_id TEXT,
     days_channel_id TEXT,
     roles_channel_id TEXT,
-    channels_channel_id TEXT,
-    welcome_channel_id TEXT,
-    welcome_title TEXT
+    channels_channel_id TEXT
   )
 `);
+
+// Add new columns if they don't exist (for existing databases)
+db.run(`ALTER TABLE guilds ADD COLUMN welcome_channel_id TEXT`, (err: any) => {
+  if (err && !err.message.includes('duplicate column name')) {
+    console.error('Error adding welcome_channel_id column:', err);
+  }
+});
+db.run(`ALTER TABLE guilds ADD COLUMN welcome_title TEXT`, (err: any) => {
+  if (err && !err.message.includes('duplicate column name')) {
+    console.error('Error adding welcome_title column:', err);
+  }
+});
 
 interface GuildStats {
   guild_id: string;
