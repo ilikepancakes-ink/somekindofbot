@@ -24,6 +24,16 @@ db.run(`ALTER TABLE guilds ADD COLUMN welcome_title TEXT`, (err: any) => {
     console.error('Error adding welcome_title column:', err);
   }
 });
+db.run(`ALTER TABLE guilds ADD COLUMN goodbye_channel_id TEXT`, (err: any) => {
+  if (err && !err.message.includes('duplicate column name')) {
+    console.error('Error adding goodbye_channel_id column:', err);
+  }
+});
+db.run(`ALTER TABLE guilds ADD COLUMN goodbye_title TEXT`, (err: any) => {
+  if (err && !err.message.includes('duplicate column name')) {
+    console.error('Error adding goodbye_title column:', err);
+  }
+});
 
 interface GuildStats {
   guild_id: string;
@@ -33,6 +43,8 @@ interface GuildStats {
   channels_channel_id?: string;
   welcome_channel_id?: string;
   welcome_title?: string;
+  goodbye_channel_id?: string;
+  goodbye_title?: string;
 }
 
 function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
@@ -47,8 +59,8 @@ function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
 function setGuildStats(stats: GuildStats): Promise<void> {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT OR REPLACE INTO guilds (guild_id, member_channel_id, days_channel_id, roles_channel_id, channels_channel_id, welcome_channel_id, welcome_title) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [stats.guild_id, stats.member_channel_id, stats.days_channel_id, stats.roles_channel_id, stats.channels_channel_id, stats.welcome_channel_id, stats.welcome_title],
+      'INSERT OR REPLACE INTO guilds (guild_id, member_channel_id, days_channel_id, roles_channel_id, channels_channel_id, welcome_channel_id, welcome_title, goodbye_channel_id, goodbye_title) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [stats.guild_id, stats.member_channel_id, stats.days_channel_id, stats.roles_channel_id, stats.channels_channel_id, stats.welcome_channel_id, stats.welcome_title, stats.goodbye_channel_id, stats.goodbye_title],
       (err: any) => {
         if (err) reject(err);
         else resolve();
