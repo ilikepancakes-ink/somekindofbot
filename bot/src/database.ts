@@ -9,7 +9,9 @@ db.run(`
     member_channel_id TEXT,
     days_channel_id TEXT,
     roles_channel_id TEXT,
-    channels_channel_id TEXT
+    channels_channel_id TEXT,
+    welcome_channel_id TEXT,
+    welcome_title TEXT
   )
 `);
 
@@ -19,6 +21,8 @@ interface GuildStats {
   days_channel_id?: string;
   roles_channel_id?: string;
   channels_channel_id?: string;
+  welcome_channel_id?: string;
+  welcome_title?: string;
 }
 
 function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
@@ -33,8 +37,8 @@ function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
 function setGuildStats(stats: GuildStats): Promise<void> {
   return new Promise((resolve, reject) => {
     db.run(
-      'INSERT OR REPLACE INTO guilds (guild_id, member_channel_id, days_channel_id, roles_channel_id, channels_channel_id) VALUES (?, ?, ?, ?, ?)',
-      [stats.guild_id, stats.member_channel_id, stats.days_channel_id, stats.roles_channel_id, stats.channels_channel_id],
+      'INSERT OR REPLACE INTO guilds (guild_id, member_channel_id, days_channel_id, roles_channel_id, channels_channel_id, welcome_channel_id, welcome_title) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [stats.guild_id, stats.member_channel_id, stats.days_channel_id, stats.roles_channel_id, stats.channels_channel_id, stats.welcome_channel_id, stats.welcome_title],
       (err: any) => {
         if (err) reject(err);
         else resolve();
