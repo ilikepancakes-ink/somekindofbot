@@ -1,5 +1,5 @@
 import { Events } from 'discord.js';
-import { getAllGuildStats } from '../database';
+const { getAllGuildStats } = require('../database');
 
 module.exports = {
   name: Events.ClientReady,

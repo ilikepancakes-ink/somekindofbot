@@ -13,7 +13,7 @@ db.run(`
   )
 `);
 
-export interface GuildStats {
+interface GuildStats {
   guild_id: string;
   member_channel_id?: string;
   days_channel_id?: string;
@@ -21,21 +21,21 @@ export interface GuildStats {
   channels_channel_id?: string;
 }
 
-export function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
+function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
   return new Promise((resolve, reject) => {
-    db.get('SELECT * FROM guilds WHERE guild_id = ?', [guildId], (err, row) => {
+    db.get('SELECT * FROM guilds WHERE guild_id = ?', [guildId], (err: any, row: any) => {
       if (err) reject(err);
       else resolve(row as GuildStats | undefined);
     });
   });
 }
 
-export function setGuildStats(stats: GuildStats): Promise<void> {
+function setGuildStats(stats: GuildStats): Promise<void> {
   return new Promise((resolve, reject) => {
     db.run(
       'INSERT OR REPLACE INTO guilds (guild_id, member_channel_id, days_channel_id, roles_channel_id, channels_channel_id) VALUES (?, ?, ?, ?, ?)',
       [stats.guild_id, stats.member_channel_id, stats.days_channel_id, stats.roles_channel_id, stats.channels_channel_id],
-      (err) => {
+      (err: any) => {
         if (err) reject(err);
         else resolve();
       }
@@ -43,11 +43,17 @@ export function setGuildStats(stats: GuildStats): Promise<void> {
   });
 }
 
-export function getAllGuildStats(): Promise<GuildStats[]> {
+function getAllGuildStats(): Promise<GuildStats[]> {
   return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM guilds', [], (err, rows) => {
+    db.all('SELECT * FROM guilds', [], (err: any, rows: any) => {
       if (err) reject(err);
       else resolve(rows as GuildStats[]);
     });
   });
 }
+
+module.exports = {
+  getGuildStats,
+  setGuildStats,
+  getAllGuildStats,
+};
