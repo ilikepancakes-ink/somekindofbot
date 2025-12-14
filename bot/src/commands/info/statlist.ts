@@ -63,52 +63,64 @@ module.exports = {
     const existingMembers = category.children.cache.find((c: GuildChannel) => c.name.startsWith('Members: '));
     if (existingMembers) {
       await existingMembers.setName(`Members: ${memberCount}`);
+      await existingMembers.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
+      stats.member_channel_id = existingMembers.id;
     } else {
-      await guild.channels.create({
+      const channel = await guild.channels.create({
         name: `Members: ${memberCount}`,
         type: ChannelType.GuildVoice,
         parent: category.id,
         permissionOverwrites: [{ id: guild.id, deny: ['Connect'] }]
       });
+      stats.member_channel_id = channel.id;
     }
 
     // Create or update Days channel
     const existingDays = category.children.cache.find((c: GuildChannel) => c.name.startsWith('Days: '));
     if (existingDays) {
       await existingDays.setName(`Days: ${daysSince}`);
+      await existingDays.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
+      stats.days_channel_id = existingDays.id;
     } else {
-      await guild.channels.create({
+      const channel = await guild.channels.create({
         name: `Days: ${daysSince}`,
         type: ChannelType.GuildVoice,
         parent: category.id,
         permissionOverwrites: [{ id: guild.id, deny: ['Connect'] }]
       });
+      stats.days_channel_id = channel.id;
     }
 
     // Create or update Roles channel
     const existingRoles = category.children.cache.find((c: GuildChannel) => c.name.startsWith('Roles: '));
     if (existingRoles) {
       await existingRoles.setName(`Roles: ${roleCount}`);
+      await existingRoles.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
+      stats.roles_channel_id = existingRoles.id;
     } else {
-      await guild.channels.create({
+      const channel = await guild.channels.create({
         name: `Roles: ${roleCount}`,
         type: ChannelType.GuildVoice,
         parent: category.id,
         permissionOverwrites: [{ id: guild.id, deny: ['Connect'] }]
       });
+      stats.roles_channel_id = channel.id;
     }
 
     // Create or update Channels channel
     const existingChannels = category.children.cache.find((c: GuildChannel) => c.name.startsWith('Channels: '));
     if (existingChannels) {
       await existingChannels.setName(`Channels: ${channelCount}`);
+      await existingChannels.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
+      stats.channels_channel_id = existingChannels.id;
     } else {
-      await guild.channels.create({
+      const channel = await guild.channels.create({
         name: `Channels: ${channelCount}`,
         type: ChannelType.GuildVoice,
         parent: category.id,
         permissionOverwrites: [{ id: guild.id, deny: ['Connect'] }]
       });
+      stats.channels_channel_id = channel.id;
     }
 
     // Save to DB

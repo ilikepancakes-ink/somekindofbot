@@ -25,25 +25,37 @@ module.exports = {
           // Update Members channel
           if (stats.member_channel_id) {
             const channel = guild.channels.cache.get(stats.member_channel_id);
-            if (channel) await channel.setName(`Members: ${memberCount}`);
+            if (channel) {
+              await channel.setName(`Members: ${memberCount}`);
+              await channel.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
+            }
           }
 
           // Update Days channel
           if (stats.days_channel_id) {
             const channel = guild.channels.cache.get(stats.days_channel_id);
-            if (channel) await channel.setName(`Days: ${daysSince}`);
+            if (channel) {
+              await channel.setName(`Days: ${daysSince}`);
+              await channel.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
+            }
           }
 
           // Update Roles channel
           if (stats.roles_channel_id) {
             const channel = guild.channels.cache.get(stats.roles_channel_id);
-            if (channel) await channel.setName(`Roles: ${roleCount}`);
+            if (channel) {
+              await channel.setName(`Roles: ${roleCount}`);
+              await channel.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
+            }
           }
 
           // Update Channels channel
           if (stats.channels_channel_id) {
             const channel = guild.channels.cache.get(stats.channels_channel_id);
-            if (channel) await channel.setName(`Channels: ${channelCount}`);
+            if (channel) {
+              await channel.setName(`Channels: ${channelCount}`);
+              await channel.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
+            }
           }
         }
       } catch (error) {
