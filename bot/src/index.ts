@@ -29,7 +29,7 @@ async function main() {
 
     for (const folder of commandFolders) {
       const folderPath = path.join(commandsPath, folder);
-      const commandFiles = fs.readdirSync(folderPath).filter(file => file.endsWith('.ts'));
+      const commandFiles = fs.readdirSync(folderPath).filter(file => file.endsWith('.js'));
 
       for (const file of commandFiles) {
         const filePath = path.join(folderPath, file);
@@ -60,7 +60,7 @@ async function main() {
 
     // Load events
     const eventsPath = path.join(__dirname, 'events');
-    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.ts'));
+    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
     for (const file of eventFiles) {
       const filePath = path.join(eventsPath, file);
