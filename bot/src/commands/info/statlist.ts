@@ -1,9 +1,10 @@
-import { SlashCommandBuilder, EmbedBuilder, ChannelType, GuildChannel } from 'discord.js';
+import { SlashCommandBuilder, ChannelType, GuildChannel } from 'discord.js';
+import { getGuildStats, setGuildStats, GuildStats } from '../database';
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('statlist')
-    .setDescription('Show server stats with a locked voice channel displaying member count'),
+    .setDescription('creates a statist that shows at the top of the channel list'),
 
   async execute(interaction: any) {
     const guild = interaction.guild;
@@ -11,6 +12,14 @@ module.exports = {
     if (!guild) {
       await interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
       return;
+    }
+
+    await interaction.deferReply();
+
+    // Get existing stats from DB
+    let stats = await getGuildStats(guild.id);
+    if (!stats) {
+      stats = { guild_id: guild.id };
     }
 
     // Find or create the "Server Stats" category at the top
@@ -23,39 +32,71 @@ module.exports = {
       });
     }
 
-    // Find or create the locked voice channel showing member count
-    let voiceChannel = category.children.cache.find((c: GuildChannel) => c.name.startsWith('Members:') && c.type === ChannelType.GuildVoice);
-    if (!voiceChannel) {
-      voiceChannel = await guild.channels.create({
-        name: `Members: ${guild.memberCount}`,
+    // Calculate stats
+    const memberCount = guild.memberCount;
+    const daysSince = Math.floor((Date.now() - guild.createdTimestamp) / (1000 * 60 * 60 * 24));
+    const roleCount = guild.roles.cache.size;
+    const channelCount = guild.channels.cache.size;
+
+    // Create or update Members channel
+    if (!stats.member_channel_id) {
+      const channel = await guild.channels.create({
+        name: `Members: ${memberCount}`,
         type: ChannelType.GuildVoice,
         parent: category.id,
-        permissionOverwrites: [
-          {
-            id: guild.id,
-            deny: ['Connect']
-          }
-        ]
+        permissionOverwrites: [{ id: guild.id, deny: ['Connect'] }]
       });
+      stats.member_channel_id = channel.id;
     } else {
-      // Update the name if it exists
-      await voiceChannel.setName(`Members: ${guild.memberCount}`);
+      const channel = guild.channels.cache.get(stats.member_channel_id);
+      if (channel) await channel.setName(`Members: ${memberCount}`);
     }
 
-    // Calculate days since server creation
-    const daysSince = Math.floor((Date.now() - guild.createdTimestamp) / (1000 * 60 * 60 * 24));
+    // Create or update Days channel
+    if (!stats.days_channel_id) {
+      const channel = await guild.channels.create({
+        name: `Days: ${daysSince}`,
+        type: ChannelType.GuildVoice,
+        parent: category.id,
+        permissionOverwrites: [{ id: guild.id, deny: ['Connect'] }]
+      });
+      stats.days_channel_id = channel.id;
+    } else {
+      const channel = guild.channels.cache.get(stats.days_channel_id);
+      if (channel) await channel.setName(`Days: ${daysSince}`);
+    }
 
-    // Create the embed with stats
-    const embed = new EmbedBuilder()
-      .setTitle('Server Stats')
-      .addFields(
-        { name: 'Days Since Creation', value: daysSince.toString(), inline: true },
-        { name: 'Role Count', value: guild.roles.cache.size.toString(), inline: true },
-        { name: 'Channel Count', value: guild.channels.cache.size.toString(), inline: true }
-      )
-      .setColor(0x0099ff)
-      .setTimestamp();
+    // Create or update Roles channel
+    if (!stats.roles_channel_id) {
+      const channel = await guild.channels.create({
+        name: `Roles: ${roleCount}`,
+        type: ChannelType.GuildVoice,
+        parent: category.id,
+        permissionOverwrites: [{ id: guild.id, deny: ['Connect'] }]
+      });
+      stats.roles_channel_id = channel.id;
+    } else {
+      const channel = guild.channels.cache.get(stats.roles_channel_id);
+      if (channel) await channel.setName(`Roles: ${roleCount}`);
+    }
 
-    await interaction.reply({ embeds: [embed] });
+    // Create or update Channels channel
+    if (!stats.channels_channel_id) {
+      const channel = await guild.channels.create({
+        name: `Channels: ${channelCount}`,
+        type: ChannelType.GuildVoice,
+        parent: category.id,
+        permissionOverwrites: [{ id: guild.id, deny: ['Connect'] }]
+      });
+      stats.channels_channel_id = channel.id;
+    } else {
+      const channel = guild.channels.cache.get(stats.channels_channel_id);
+      if (channel) await channel.setName(`Channels: ${channelCount}`);
+    }
+
+    // Save to DB
+    await setGuildStats(stats);
+
+    await interaction.editReply({ content: 'Server stats channels created/updated successfully!' });
   },
 };
