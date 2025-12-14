@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_links/app_links.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -32,7 +33,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final TextEditingController _botIdController = TextEditingController();
+  final TextEditingController _tokenController = TextEditingController();
   String? _token;
   StreamSubscription<Uri?>? _sub;
   final _appLinks = AppLinks();
@@ -92,16 +93,23 @@ class _HomePageState extends State<HomePage> {
             ? ManagementScreen(token: _token!)
             : Column(
                 children: [
+                  const Text(
+                    'Use the /generate-token command in Discord to get your auth token.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 20),
                   TextField(
-                    controller: _botIdController,
+                    controller: _tokenController,
                     decoration: const InputDecoration(
-                      labelText: 'Bot ID',
+                      labelText: 'Auth Token',
+                      hintText: 'Paste your auth token here',
                     ),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: _signIn,
-                    child: const Text('Sign In with Discord'),
+                    onPressed: _loginWithToken,
+                    child: const Text('Login'),
                   ),
                 ],
               ),
@@ -109,17 +117,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _signIn() async {
-    final botId = _botIdController.text.trim();
-    if (botId.isEmpty) return;
+  void _loginWithToken() {
+    final token = _tokenController.text.trim();
+    if (token.isEmpty) return;
 
-    const redirectUri = 'https://discordbot.0x409.nl/callback';
-    final url =
-        'https://discord.com/api/oauth2/authorize?client_id=$botId&redirect_uri=${Uri.encodeComponent(redirectUri)}&response_type=code&scope=identify';
-
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    }
+    setState(() {
+      _token = token;
+    });
   }
 }
 
@@ -137,33 +141,90 @@ class _ManagementScreenState extends State<ManagementScreen> {
   List<Map<String, dynamic>> bans = [];
   List<Map<String, dynamic>> warns = [];
   List<Map<String, dynamic>> roles = [];
+  List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> envVars = [];
+  List<Map<String, dynamic>> servers = [];
+  String? selectedServerId;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
+    _loadServers();
     _loadData();
+    _setupTouchBar();
+    _startAutoRefresh();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    // Refresh server data every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _loadServers();
+      _loadData();
+    });
+  }
+
+  void _setupTouchBar() {
+    const platform = MethodChannel('com.example.management_panel/touchbar');
+    // Notify native side that user is logged in
+    platform.invokeMethod('setLoginStatus', true);
+    platform.setMethodCallHandler((call) async {
+      if (!mounted) return;
+      switch (call.method) {
+        case 'showMembers':
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Members accessed from Touch Bar')));
+          break;
+        case 'selectServer':
+          final serverId = call.arguments as String;
+          setState(() {
+            selectedServerId = serverId;
+          });
+          _loadData();
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Server switched to $serverId from Touch Bar')));
+          break;
+        case 'updateBot':
+          const baseUrl = 'https://discordbot.0x409.nl';
+          await http.post(Uri.parse('$baseUrl/api/update'), headers: {'Authorization': 'Bearer ${widget.token}'});
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updating from Touch Bar...')));
+          break;
+        case 'restartBot':
+          const baseUrl = 'https://discordbot.0x409.nl';
+          await http.post(Uri.parse('$baseUrl/api/restart'), headers: {'Authorization': 'Bearer ${widget.token}'});
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Restarting from Touch Bar...')));
+          break;
+      }
+    });
   }
 
   Future<void> _loadData() async {
     const baseUrl = 'https://discordbot.0x409.nl';
     final headers = {'Authorization': 'Bearer ${widget.token}'};
+    final guildParam = selectedServerId != null ? '?guildId=$selectedServerId' : '';
 
     try {
-      final res1 = await http.get(Uri.parse('$baseUrl/api/timeouts'), headers: headers);
+      final res1 = await http.get(Uri.parse('$baseUrl/api/timeouts$guildParam'), headers: headers);
       timeouts = List<Map<String, dynamic>>.from(jsonDecode(res1.body));
 
-      final res2 = await http.get(Uri.parse('$baseUrl/api/bans'), headers: headers);
+      final res2 = await http.get(Uri.parse('$baseUrl/api/bans$guildParam'), headers: headers);
       bans = List<Map<String, dynamic>>.from(jsonDecode(res2.body));
 
-      final res3 = await http.get(Uri.parse('$baseUrl/api/warns'), headers: headers);
+      final res3 = await http.get(Uri.parse('$baseUrl/api/warns$guildParam'), headers: headers);
       warns = List<Map<String, dynamic>>.from(jsonDecode(res3.body));
 
-      final res4 = await http.get(Uri.parse('$baseUrl/api/roles'), headers: headers);
+      final res4 = await http.get(Uri.parse('$baseUrl/api/roles$guildParam'), headers: headers);
       roles = List<Map<String, dynamic>>.from(jsonDecode(res4.body));
 
-      final res5 = await http.get(Uri.parse('$baseUrl/api/env'), headers: headers);
-      envVars = List<Map<String, dynamic>>.from(jsonDecode(res5.body));
+      final res5 = await http.get(Uri.parse('$baseUrl/api/members$guildParam'), headers: headers);
+      members = List<Map<String, dynamic>>.from(jsonDecode(res5.body));
+
+      final res6 = await http.get(Uri.parse('$baseUrl/api/env'), headers: headers);
+      envVars = List<Map<String, dynamic>>.from(jsonDecode(res6.body));
 
       setState(() {});
     } catch (e) {
@@ -171,39 +232,82 @@ class _ManagementScreenState extends State<ManagementScreen> {
     }
   }
 
+  Future<void> _loadServers() async {
+    const baseUrl = 'https://discordbot.0x409.nl';
+    final headers = {'Authorization': 'Bearer ${widget.token}'};
+
+    final res = await http.get(Uri.parse('$baseUrl/api/guilds'), headers: headers);
+    servers = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+    if (servers.isNotEmpty) {
+      selectedServerId = servers[0]['id'];
+    }
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 6,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Bot Management'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Timeouts'),
-              Tab(text: 'Bans'),
-              Tab(text: 'Warns'),
-              Tab(text: 'Roles'),
-              Tab(text: 'Env Vars'),
-              Tab(text: 'Actions'),
-            ],
+    if (servers.isEmpty) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: DropdownButton<String>(
+            value: selectedServerId,
+            onChanged: (value) {
+              setState(() {
+                selectedServerId = value;
+              });
+              _loadData();
+            },
+            items: servers.map((server) {
+              return DropdownMenuItem<String>(
+                value: server['id'],
+                child: Text(server['name']),
+              );
+            }).toList(),
           ),
         ),
-        body: TabBarView(
-          children: [
-            _buildList('Timeouts', timeouts),
-            _buildList('Bans', bans),
-            _buildList('Warns', warns),
-            _buildList('Roles', roles),
-            _buildEnvList(),
-            _buildActions(),
-          ],
+        Expanded(
+          child: DefaultTabController(
+            length: 7,
+            child: Scaffold(
+              appBar: AppBar(
+                title: const Text('Bot Management'),
+                bottom: const TabBar(
+                  tabs: [
+                    Tab(text: 'Timeouts'),
+                    Tab(text: 'Bans'),
+                    Tab(text: 'Warns'),
+                    Tab(text: 'Roles'),
+                    Tab(text: 'Members'),
+                    Tab(text: 'Env Vars'),
+                    Tab(text: 'Actions'),
+                  ],
+                ),
+              ),
+              body: TabBarView(
+                children: [
+                  _buildList('Timeouts', timeouts),
+                  _buildList('Bans', bans),
+                  _buildList('Warns', warns),
+                  _buildList('Roles', roles, editable: true),
+                  _buildList('Members', members),
+                  _buildEnvList(),
+                  _buildActions(),
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildList(String title, List<Map<String, dynamic>> items) {
+  Widget _buildList(String title, List<Map<String, dynamic>> items, {bool editable = false}) {
     return ListView.builder(
       itemCount: items.length,
       itemBuilder: (context, index) {
@@ -211,6 +315,10 @@ class _ManagementScreenState extends State<ManagementScreen> {
         return ListTile(
           title: Text(item['user'] ?? item['name'] ?? 'Item ${item['id']}'),
           subtitle: Text(item.toString()),
+          trailing: editable ? IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () => _editRole(item),
+          ) : null,
         );
       },
     );
@@ -258,6 +366,46 @@ class _ManagementScreenState extends State<ManagementScreen> {
               );
               Navigator.pop(context);
               _loadData();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editRole(Map<String, dynamic> item) {
+    final nameController = TextEditingController(text: item['name']);
+    final colorController = TextEditingController(text: item['color']);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit Role ${item['id']}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            TextField(
+              controller: colorController,
+              decoration: const InputDecoration(labelText: 'Color'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              item['name'] = nameController.text;
+              item['color'] = colorController.text;
+              // For now, no API to update roles, just update locally
+              setState(() {});
+              Navigator.pop(context);
             },
             child: const Text('Save'),
           ),

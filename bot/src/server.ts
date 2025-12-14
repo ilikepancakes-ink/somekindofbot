@@ -10,6 +10,7 @@ const port = 2976;
 
 const clientId = process.env.DISCORD_CLIENT_ID!;
 const clientSecret = process.env.DISCORD_CLIENT_SECRET!;
+const botAdminUserId = process.env.BOT_ADMIN_USER_ID!;
 
 // Simple in-memory session store (use database in production)
 const sessions: { [key: string]: { userId: string } } = {};
@@ -80,6 +81,29 @@ app.get('/validate', (req, res) => {
   }
 });
 
+// Endpoint for bot to generate auth tokens for admin users only
+app.post('/api/generate-token', (req, res) => {
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID required' });
+  }
+
+  // Only allow token generation for the admin user
+  if (userId !== botAdminUserId) {
+    return res.status(403).json({ error: 'Access denied. Only admin user can generate tokens.' });
+  }
+
+  // Generate session token for the user
+  const sessionToken = crypto.randomBytes(32).toString('hex');
+  sessions[sessionToken] = { userId };
+
+  res.json({
+    success: true,
+    token: sessionToken,
+    loginUrl: `somekindofbot://callback?token=${sessionToken}`
+  });
+});
+
 // API endpoints for management
 app.get('/api/env', auth, (req, res) => {
   try {
@@ -126,29 +150,55 @@ app.post('/api/update', auth, (req, res) => {
 
 // Mock data for other features
 app.get('/api/timeouts', auth, (req, res) => {
-  res.json([
-    { id: 1, user: 'User1', reason: 'Spam', duration: '1h' },
-    { id: 2, user: 'User2', reason: 'Offensive', duration: '30m' },
-  ]);
+  const guildId = req.query.guildId as string;
+  const mockTimeouts = {
+    '1': [{ id: 1, user: 'User1', reason: 'Spam', duration: '1h' }],
+    '2': [{ id: 2, user: 'User2', reason: 'Offensive', duration: '30m' }],
+  };
+  res.json((mockTimeouts as any)[guildId] || []);
 });
 
 app.get('/api/bans', auth, (req, res) => {
-  res.json([
-    { id: 1, user: 'User3', reason: 'Toxic' },
-  ]);
+  const guildId = req.query.guildId as string;
+  const mockBans = {
+    '1': [{ id: 1, user: 'User3', reason: 'Toxic' }],
+    '2': [],
+  };
+  res.json((mockBans as any)[guildId] || []);
 });
 
 app.get('/api/warns', auth, (req, res) => {
-  res.json([
-    { id: 1, user: 'User4', reason: 'Mild offense', count: 1 },
-  ]);
+  const guildId = req.query.guildId as string;
+  const mockWarns = {
+    '1': [{ id: 1, user: 'User4', reason: 'Mild offense', count: 1 }],
+    '2': [{ id: 2, user: 'User5', reason: 'Spam', count: 2 }],
+  };
+  res.json((mockWarns as any)[guildId] || []);
 });
 
 app.get('/api/roles', auth, (req, res) => {
+  const guildId = req.query.guildId as string;
+  const mockRoles = {
+    '1': [{ id: 1, name: 'Admin', color: '#ff0000' }, { id: 2, name: 'Member', color: '#00ff00' }],
+    '2': [{ id: 3, name: 'Moderator', color: '#0000ff' }],
+  };
+  res.json((mockRoles as any)[guildId] || []);
+});
+
+app.get('/api/guilds', auth, (req, res) => {
   res.json([
-    { id: 1, name: 'Admin', color: '#ff0000' },
-    { id: 2, name: 'Member', color: '#00ff00' },
+    { id: '1', name: 'Main Server' },
+    { id: '2', name: 'Test Server' },
   ]);
+});
+
+app.get('/api/members', auth, (req, res) => {
+  const guildId = req.query.guildId as string;
+  const mockMembers = {
+    '1': [{ id: '1', username: 'User1' }, { id: '2', username: 'User2' }],
+    '2': [{ id: '3', username: 'User3' }],
+  };
+  res.json((mockMembers as any)[guildId] || []);
 });
 
 app.listen(port, () => {
