@@ -40,6 +40,12 @@ module.exports = {
       await category.setPosition(0);
     }
 
+    // Remove any duplicate categories
+    const duplicateCategories = guild.channels.cache.filter((c: GuildChannel) => c.name === 'Server Stats' && c.type === ChannelType.GuildCategory && c.id !== category.id);
+    for (const dup of duplicateCategories.values()) {
+      await dup.delete();
+    }
+
     // Calculate stats
     const memberCount = guild.memberCount;
     const daysSince = Math.floor((Date.now() - guild.createdTimestamp) / (1000 * 60 * 60 * 24));
