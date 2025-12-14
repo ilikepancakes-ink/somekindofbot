@@ -14,8 +14,9 @@ module.exports = {
 
       try {
         await command.execute(interaction);
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
+        if (error.code === 10062) return; // Don't respond to expired interactions
         if (interaction.replied || interaction.deferred) {
           await interaction.followUp({ content: 'There was an error while executing this command!', flags: 64 });
         } else {

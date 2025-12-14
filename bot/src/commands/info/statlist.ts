@@ -15,12 +15,7 @@ module.exports = {
       return;
     }
 
-    try {
-      await interaction.deferReply();
-    } catch (error: any) {
-      if (error.code === 10062) return; // Unknown interaction, token expired
-      throw error;
-    }
+    await interaction.deferReply();
 
     // Get existing stats from DB
     let stats = await getGuildStats(guild.id);
