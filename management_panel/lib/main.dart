@@ -406,10 +406,22 @@ class _ManagementScreenState extends State<ManagementScreen> {
         return ListTile(
           title: Text(item['user'] ?? item['name'] ?? 'Item ${item['id']}'),
           subtitle: Text(item.toString()),
-          trailing: editable ? IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => _editRole(item),
-          ) : null,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (editable)
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => _editRole(item),
+                ),
+              if (title == 'Bans')
+                IconButton(
+                  icon: const Icon(Icons.undo),
+                  tooltip: 'Unban',
+                  onPressed: () => _unbanUser(item),
+                ),
+            ],
+          ),
         );
       },
     );
@@ -503,13 +515,68 @@ class _ManagementScreenState extends State<ManagementScreen> {
           ),
           TextButton(
             onPressed: () async {
-              item['name'] = nameController.text;
-              item['color'] = colorController.text;
-              // For now, no API to update roles, just update locally
-              setState(() {});
-              Navigator.pop(context);
+              try {
+                const baseUrl = 'https://discordbot.0x409.nl';
+                await http.patch(
+                  Uri.parse('$baseUrl/api/roles/${item['id']}'),
+                  headers: {'Authorization': 'Bearer ${widget.token}', 'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'guildId': selectedServerId,
+                    'name': nameController.text,
+                    'color': colorController.text,
+                  }),
+                );
+                Navigator.pop(context);
+                _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Role updated successfully')));
+              } catch (e) {
+                print('❌ API Error in _editRole: $e');
+                print('   URL: https://discordbot.0x409.nl/api/roles/${item['id']}');
+                print('   Token: ${widget.token.substring(0, 20)}...');
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update role')));
+              }
             },
             child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _unbanUser(Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Unban User'),
+        content: Text('Are you sure you want to unban ${item['user']}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                const baseUrl = 'https://discordbot.0x409.nl';
+                await http.delete(
+                  Uri.parse('$baseUrl/api/bans'),
+                  headers: {'Authorization': 'Bearer ${widget.token}', 'Content-Type': 'application/json'},
+                  body: jsonEncode({
+                    'guildId': selectedServerId,
+                    'userId': item['id'],
+                  }),
+                );
+                Navigator.pop(context);
+                _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User unbanned successfully')));
+              } catch (e) {
+                print('❌ API Error in _unbanUser: $e');
+                print('   URL: https://discordbot.0x409.nl/api/bans');
+                print('   Token: ${widget.token.substring(0, 20)}...');
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to unban user')));
+              }
+            },
+            child: const Text('Unban'),
           ),
         ],
       ),
