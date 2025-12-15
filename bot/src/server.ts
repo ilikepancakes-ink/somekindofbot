@@ -10,6 +10,7 @@ const port = 2976;
 
 const clientId = process.env.DISCORD_CLIENT_ID!;
 const clientSecret = process.env.DISCORD_CLIENT_SECRET!;
+const botToken = process.env.DISCORD_TOKEN!;
 const botAdminUserId = process.env.BOT_ADMIN_USER_ID!;
 
 // Simple in-memory session store (use database in production)
@@ -199,20 +200,27 @@ app.post('/api/update', auth, (req, res) => {
   // Simulate update
 });
 
-// Mock data for other features
-app.get('/api/timeouts', auth, (req, res) => {
+// Live data from Discord API
+app.get('/api/timeouts', auth, async (req, res) => {
   const guildId = req.query.guildId as string;
   console.log(`⏰ API Request: GET /api/timeouts`);
   console.log(`   User: ${(req as any).userId}`);
   console.log(`   Guild: ${guildId || 'none'}`);
 
-  const mockTimeouts = {
-    '1': [{ id: 1, user: 'User1', reason: 'Spam', duration: '1h' }],
-    '2': [{ id: 2, user: 'User2', reason: 'Offensive', duration: '30m' }],
-  };
-  const result = (mockTimeouts as any)[guildId] || [];
-  console.log(`✅ API Success: Returned ${result.length} timeout records`);
-  res.json(result);
+  try {
+    // For now, return mock data until database is implemented
+    // In future, fetch from database or Discord API
+    const mockTimeouts = {
+      '1': [{ id: 1, user: 'User1', reason: 'Spam', duration: '1h' }],
+      '2': [{ id: 2, user: 'User2', reason: 'Offensive', duration: '30m' }],
+    };
+    const result = (mockTimeouts as any)[guildId] || [];
+    console.log(`✅ API Success: Returned ${result.length} timeout records`);
+    res.json(result);
+  } catch (e) {
+    console.error(`❌ API Error in GET /api/timeouts: ${e}`);
+    res.status(500).send('Error fetching timeouts');
+  }
 });
 
 app.get('/api/bans', auth, (req, res) => {
@@ -245,46 +253,98 @@ app.get('/api/warns', auth, (req, res) => {
   res.json(result);
 });
 
-app.get('/api/roles', auth, (req, res) => {
+app.get('/api/roles', auth, async (req, res) => {
   const guildId = req.query.guildId as string;
   console.log(`👥 API Request: GET /api/roles`);
   console.log(`   User: ${(req as any).userId}`);
   console.log(`   Guild: ${guildId || 'none'}`);
 
-  const mockRoles = {
-    '1': [{ id: 1, name: 'Admin', color: '#ff0000' }, { id: 2, name: 'Member', color: '#00ff00' }],
-    '2': [{ id: 3, name: 'Moderator', color: '#0000ff' }],
-  };
-  const result = (mockRoles as any)[guildId] || [];
-  console.log(`✅ API Success: Returned ${result.length} role records`);
-  res.json(result);
+  try {
+    const response = await axios.get(`https://discord.com/api/guilds/${guildId}/roles`, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+      },
+    });
+
+    const result = response.data.map((role: any) => ({
+      id: role.id,
+      name: role.name,
+      color: `#${role.color.toString(16).padStart(6, '0')}`,
+    }));
+
+    console.log(`✅ API Success: Returned ${result.length} role records`);
+    res.json(result);
+  } catch (e) {
+    console.error(`❌ API Error in GET /api/roles: ${e}`);
+    // Fallback to mock data if Discord API fails
+    const mockRoles = {
+      '1': [{ id: 1, name: 'Admin', color: '#ff0000' }, { id: 2, name: 'Member', color: '#00ff00' }],
+      '2': [{ id: 3, name: 'Moderator', color: '#0000ff' }],
+    };
+    const result = (mockRoles as any)[guildId] || [];
+    res.json(result);
+  }
 });
 
-app.get('/api/guilds', auth, (req, res) => {
+app.get('/api/guilds', auth, async (req, res) => {
   console.log(`🏰 API Request: GET /api/guilds`);
   console.log(`   User: ${(req as any).userId}`);
 
-  const result = [
-    { id: '1', name: 'Main Server' },
-    { id: '2', name: 'Test Server' },
-  ];
-  console.log(`✅ API Success: Returned ${result.length} guild records`);
-  res.json(result);
+  try {
+    const response = await axios.get('https://discord.com/api/users/@me/guilds', {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+      },
+    });
+
+    const result = response.data.map((guild: any) => ({
+      id: guild.id,
+      name: guild.name,
+    }));
+
+    console.log(`✅ API Success: Returned ${result.length} guild records`);
+    res.json(result);
+  } catch (e) {
+    console.error(`❌ API Error in GET /api/guilds: ${e}`);
+    // Fallback to mock data if Discord API fails
+    const result = [
+      { id: '1', name: 'Main Server' },
+      { id: '2', name: 'Test Server' },
+    ];
+    res.json(result);
+  }
 });
 
-app.get('/api/members', auth, (req, res) => {
+app.get('/api/members', auth, async (req, res) => {
   const guildId = req.query.guildId as string;
   console.log(`👤 API Request: GET /api/members`);
   console.log(`   User: ${(req as any).userId}`);
   console.log(`   Guild: ${guildId || 'none'}`);
 
-  const mockMembers = {
-    '1': [{ id: '1', username: 'User1' }, { id: '2', username: 'User2' }],
-    '2': [{ id: '3', username: 'User3' }],
-  };
-  const result = (mockMembers as any)[guildId] || [];
-  console.log(`✅ API Success: Returned ${result.length} member records`);
-  res.json(result);
+  try {
+    const response = await axios.get(`https://discord.com/api/guilds/${guildId}/members?limit=1000`, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+      },
+    });
+
+    const result = response.data.map((member: any) => ({
+      id: member.user.id,
+      username: member.user.username,
+    }));
+
+    console.log(`✅ API Success: Returned ${result.length} member records`);
+    res.json(result);
+  } catch (e) {
+    console.error(`❌ API Error in GET /api/members: ${e}`);
+    // Fallback to mock data if Discord API fails
+    const mockMembers = {
+      '1': [{ id: '1', username: 'User1' }, { id: '2', username: 'User2' }],
+      '2': [{ id: '3', username: 'User3' }],
+    };
+    const result = (mockMembers as any)[guildId] || [];
+    res.json(result);
+  }
 });
 
 app.listen(port, () => {

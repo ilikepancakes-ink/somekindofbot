@@ -316,6 +316,16 @@ class _ManagementScreenState extends State<ManagementScreen> {
                 child: const Text('Retry'),
               ),
               const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  // Show debug logs on Touch Bar
+                  const platform = MethodChannel('com.example.management_panel/touchbar');
+                  await platform.invokeMethod('showDebugLogs', {'error': _errorMessage});
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: const Text('Debug Logs'),
+              ),
+              const SizedBox(height: 16),
               TextButton(
                 onPressed: () {
                   // Go back to login screen

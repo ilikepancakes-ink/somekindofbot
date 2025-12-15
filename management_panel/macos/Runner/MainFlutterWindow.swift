@@ -4,6 +4,7 @@ import FlutterMacOS
 class MainFlutterWindow: NSWindow, NSTouchBarDelegate {
   var flutterMethodChannel: FlutterMethodChannel?
   var isLoggedIn = false
+  var debugLogs: String = ""
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -24,6 +25,13 @@ class MainFlutterWindow: NSWindow, NSTouchBarDelegate {
           self?.touchBar = self?.makeTouchBar()
         }
         result(nil)
+      } else if call.method == "showDebugLogs" {
+        if let args = call.arguments as? [String: Any], let error = args["error"] as? String {
+          self?.debugLogs = "Error: \(error)\nCheck console for details."
+          // Update the Touch Bar to show debug logs
+          self?.touchBar = self?.makeTouchBar()
+        }
+        result(nil)
       } else {
         result(FlutterMethodNotImplemented)
       }
@@ -37,7 +45,9 @@ class MainFlutterWindow: NSWindow, NSTouchBarDelegate {
   override func makeTouchBar() -> NSTouchBar? {
     let touchBar = NSTouchBar()
     touchBar.delegate = self
-    if isLoggedIn {
+    if !debugLogs.isEmpty {
+      touchBar.defaultItemIdentifiers = [.debugLogs]
+    } else if isLoggedIn {
       touchBar.defaultItemIdentifiers = [.membersButton, .serverSelectorButton, .updateButton, .restartButton]
     } else {
       touchBar.defaultItemIdentifiers = [.loginMessage]
@@ -47,6 +57,13 @@ class MainFlutterWindow: NSWindow, NSTouchBarDelegate {
 
   func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
     switch identifier {
+    case .debugLogs:
+      let item = NSCustomTouchBarItem(identifier: identifier)
+      let textField = NSTextField(labelWithString: debugLogs)
+      textField.alignment = .center
+      textField.maximumNumberOfLines = 2
+      item.view = textField
+      return item
     case .loginMessage:
       let item = NSCustomTouchBarItem(identifier: identifier)
       let textField = NSTextField(labelWithString: "Please login to your Discord bot!")
@@ -122,6 +139,7 @@ class MainFlutterWindow: NSWindow, NSTouchBarDelegate {
 }
 
 extension NSTouchBarItem.Identifier {
+  static let debugLogs = NSTouchBarItem.Identifier("com.example.debugLogs")
   static let loginMessage = NSTouchBarItem.Identifier("com.example.loginMessage")
   static let membersButton = NSTouchBarItem.Identifier("com.example.membersButton")
   static let serverSelectorButton = NSTouchBarItem.Identifier("com.example.serverSelectorButton")
