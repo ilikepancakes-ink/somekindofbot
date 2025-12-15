@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
@@ -10,6 +11,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'l10n/app_localizations.dart';
+import 'providers/settings_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,12 +23,39 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Management Panel',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ],
+      child: Consumer<SettingsProvider>(
+        builder: (context, settings, child) {
+          return MaterialApp(
+            title: 'Management Panel',
+            theme: ThemeData(
+              primarySwatch: Colors.blue,
+              brightness: Brightness.light,
+            ),
+            darkTheme: ThemeData(
+              primarySwatch: Colors.blue,
+              brightness: Brightness.dark,
+            ),
+            themeMode: settings.themeMode,
+            locale: settings.locale,
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('en'),
+              Locale('nl'),
+              Locale('ru'),
+            ],
+            home: const HomePage(),
+          );
+        },
       ),
-      home: const HomePage(),
     );
   }
 }
@@ -111,9 +141,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _saveToken(String token) async {
-    // Save to secure storage
-    await _secureStorage.write(key: 'auth_token', value: token);
-    // Also save to DB for persistence
+    // Try secure storage first, fall back to DB
+    try {
+      await _secureStorage.write(key: 'auth_token', value: token);
+    } catch (e) {
+      // Secure storage failed, continue with DB storage
+    }
+
+    // Always save to DB for persistence
     if (_database != null && _deviceId != null) {
       await _database!.insert(
         'tokens',
@@ -218,10 +253,10 @@ class _HomePageState extends State<HomePage> {
 class ManagementScreen extends StatefulWidget {
   final String token;
 
-  const ManagementScreen({required this.token});
+  const ManagementScreen({super.key, required this.token});
 
   @override
-  _ManagementScreenState createState() => _ManagementScreenState();
+  State<ManagementScreen> createState() => _ManagementScreenState();
 }
 
 class _ManagementScreenState extends State<ManagementScreen> {
@@ -236,13 +271,13 @@ class _ManagementScreenState extends State<ManagementScreen> {
   Timer? _refreshTimer;
   bool _isLoading = true;
   String? _errorMessage;
+  bool _touchBarSetup = false;
 
   @override
   void initState() {
     super.initState();
     _loadServers();
     _loadData();
-    _setupTouchBar();
     _startAutoRefresh();
   }
 
@@ -260,7 +295,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
     });
   }
 
-  void _setupTouchBar() {
+  void _setupTouchBar(BuildContext buildContext) {
     const platform = MethodChannel('com.example.management_panel/touchbar');
     // Notify native side that user is logged in
     platform.invokeMethod('setLoginStatus', true);
@@ -268,7 +303,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
       if (!mounted) return;
       switch (call.method) {
         case 'showMembers':
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Members accessed from Touch Bar')));
+          ScaffoldMessenger.of(buildContext).showSnackBar(const SnackBar(content: Text('Members accessed from Touch Bar')));
           break;
         case 'selectServer':
           final serverId = call.arguments as String;
@@ -276,30 +311,30 @@ class _ManagementScreenState extends State<ManagementScreen> {
             selectedServerId = serverId;
           });
           _loadData();
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Server switched to $serverId from Touch Bar')));
+          ScaffoldMessenger.of(buildContext).showSnackBar(SnackBar(content: Text('Server switched to $serverId from Touch Bar')));
           break;
         case 'updateBot':
           try {
             const baseUrl = 'https://discordbot.0x409.nl';
             await http.post(Uri.parse('$baseUrl/api/update'), headers: {'Authorization': 'Bearer ${widget.token}'});
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updating from Touch Bar...')));
+            ScaffoldMessenger.of(buildContext).showSnackBar(const SnackBar(content: Text('Updating from Touch Bar...')));
           } catch (e) {
             print('❌ API Error in Touch Bar updateBot: $e');
             print('   URL: https://discordbot.0x409.nl/api/update');
             print('   Token: ${widget.token.substring(0, 20)}...');
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update bot from Touch Bar')));
+            ScaffoldMessenger.of(buildContext).showSnackBar(const SnackBar(content: Text('Failed to update bot from Touch Bar')));
           }
           break;
         case 'restartBot':
           try {
             const baseUrl = 'https://discordbot.0x409.nl';
             await http.post(Uri.parse('$baseUrl/api/restart'), headers: {'Authorization': 'Bearer ${widget.token}'});
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Restarting from Touch Bar...')));
+            ScaffoldMessenger.of(buildContext).showSnackBar(const SnackBar(content: Text('Restarting from Touch Bar...')));
           } catch (e) {
             print('❌ API Error in Touch Bar restartBot: $e');
             print('   URL: https://discordbot.0x409.nl/api/restart');
             print('   Token: ${widget.token.substring(0, 20)}...');
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to restart bot from Touch Bar')));
+            ScaffoldMessenger.of(buildContext).showSnackBar(const SnackBar(content: Text('Failed to restart bot from Touch Bar')));
           }
           break;
       }
@@ -367,6 +402,11 @@ class _ManagementScreenState extends State<ManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_touchBarSetup) {
+      _setupTouchBar(context);
+      _touchBarSetup = true;
+    }
+
     // Show loading spinner while initially loading
     if (_isLoading) {
       return const Scaffold(
@@ -447,16 +487,22 @@ class _ManagementScreenState extends State<ManagementScreen> {
             length: 7,
             child: Scaffold(
               appBar: AppBar(
-                title: const Text('Bot Management'),
-                bottom: const TabBar(
+                title: Text(AppLocalizations.of(context)?.appTitle ?? 'Bot Management'),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.settings),
+                    onPressed: () => _showSettingsDialog(context),
+                  ),
+                ],
+                bottom: TabBar(
                   tabs: [
-                    Tab(text: 'Timeouts'),
-                    Tab(text: 'Bans'),
-                    Tab(text: 'Warns'),
-                    Tab(text: 'Roles'),
-                    Tab(text: 'Members'),
-                    Tab(text: 'Env Vars'),
-                    Tab(text: 'Actions'),
+                    Tab(text: AppLocalizations.of(context)?.timeoutsTab ?? 'Timeouts'),
+                    Tab(text: AppLocalizations.of(context)?.bansTab ?? 'Bans'),
+                    Tab(text: AppLocalizations.of(context)?.warnsTab ?? 'Warns'),
+                    Tab(text: AppLocalizations.of(context)?.rolesTab ?? 'Roles'),
+                    Tab(text: AppLocalizations.of(context)?.membersTab ?? 'Members'),
+                    Tab(text: AppLocalizations.of(context)?.envVarsTab ?? 'Env Vars'),
+                    Tab(text: AppLocalizations.of(context)?.actionsTab ?? 'Actions'),
                   ],
                 ),
               ),
@@ -468,7 +514,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
                   _buildList('Roles', roles, editable: true),
                   _buildList('Members', members),
                   _buildEnvList(),
-                  _buildActions(),
+                  _buildActions(context),
                 ],
               ),
             ),
@@ -492,13 +538,13 @@ class _ManagementScreenState extends State<ManagementScreen> {
               if (editable)
                 IconButton(
                   icon: const Icon(Icons.edit),
-                  onPressed: () => _editRole(item),
+                  onPressed: () => _editRole(context, item),
                 ),
               if (title == 'Bans')
                 IconButton(
                   icon: const Icon(Icons.undo),
                   tooltip: 'Unban',
-                  onPressed: () => _unbanUser(item),
+                  onPressed: () => _unbanUser(context, item),
                 ),
             ],
           ),
@@ -517,18 +563,18 @@ class _ManagementScreenState extends State<ManagementScreen> {
           subtitle: Text(item['value']),
           trailing: IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () => _editEnv(item),
+            onPressed: () => _editEnv(context, item),
           ),
         );
       },
     );
   }
 
-  void _editEnv(Map<String, dynamic> item) {
+  void _editEnv(BuildContext context, Map<String, dynamic> item) {
     final controller = TextEditingController(text: item['value']);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (BuildContext context) => AlertDialog(
         title: Text('Edit ${item['key']}'),
         content: TextField(
           controller: controller,
@@ -568,12 +614,12 @@ class _ManagementScreenState extends State<ManagementScreen> {
     );
   }
 
-  void _editRole(Map<String, dynamic> item) {
+  void _editRole(BuildContext context, Map<String, dynamic> item) {
     final nameController = TextEditingController(text: item['name']);
     final colorController = TextEditingController(text: item['color']);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (BuildContext context) => AlertDialog(
         title: Text('Edit Role ${item['id']}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -623,10 +669,10 @@ class _ManagementScreenState extends State<ManagementScreen> {
     );
   }
 
-  void _unbanUser(Map<String, dynamic> item) {
+  void _unbanUser(BuildContext context, Map<String, dynamic> item) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (BuildContext context) => AlertDialog(
         title: const Text('Unban User'),
         content: Text('Are you sure you want to unban ${item['user']}?'),
         actions: [
@@ -663,7 +709,91 @@ class _ManagementScreenState extends State<ManagementScreen> {
     );
   }
 
-  Widget _buildActions() {
+  void _showSettingsDialog(BuildContext context) {
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Consumer<SettingsProvider>(
+          builder: (context, settings, child) {
+            return AlertDialog(
+              title: Text(AppLocalizations.of(context)?.settings ?? 'Settings'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Theme Section
+                  Text(
+                    AppLocalizations.of(context)?.theme ?? 'Theme',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButton<ThemeMode>(
+                    value: settings.themeMode,
+                    onChanged: (ThemeMode? newMode) {
+                      if (newMode != null) {
+                        settings.setThemeMode(newMode);
+                      }
+                    },
+                    items: [
+                      DropdownMenuItem(
+                        value: ThemeMode.system,
+                        child: Text(AppLocalizations.of(context)?.systemMode ?? 'System Mode'),
+                      ),
+                      DropdownMenuItem(
+                        value: ThemeMode.light,
+                        child: Text(AppLocalizations.of(context)?.lightMode ?? 'Light Mode'),
+                      ),
+                      DropdownMenuItem(
+                        value: ThemeMode.dark,
+                        child: Text(AppLocalizations.of(context)?.darkMode ?? 'Dark Mode'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Language Section
+                  Text(
+                    AppLocalizations.of(context)?.language ?? 'Language',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButton<Locale>(
+                    value: settings.locale,
+                    onChanged: (Locale? newLocale) {
+                      if (newLocale != null) {
+                        settings.setLocale(newLocale);
+                      }
+                    },
+                    items: const [
+                      DropdownMenuItem(
+                        value: Locale('en'),
+                        child: Text('English'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('nl'),
+                        child: Text('Nederlands'),
+                      ),
+                      DropdownMenuItem(
+                        value: Locale('ru'),
+                        child: Text('Русский'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildActions(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -685,8 +815,8 @@ class _ManagementScreenState extends State<ManagementScreen> {
                 }
               }
             },
-            child: const Text('Update Bot'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text('Update Bot'),
           ),
           const SizedBox(height: 20),
           ElevatedButton(
@@ -706,8 +836,8 @@ class _ManagementScreenState extends State<ManagementScreen> {
                 }
               }
             },
-            child: const Text('Restart Bot'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text('Restart Bot'),
           ),
         ],
       ),
