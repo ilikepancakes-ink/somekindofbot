@@ -223,19 +223,80 @@ app.get('/api/timeouts', auth, async (req, res) => {
   }
 });
 
-app.get('/api/bans', auth, (req, res) => {
+app.get('/api/bans', auth, async (req, res) => {
   const guildId = req.query.guildId as string;
   console.log(`🚫 API Request: GET /api/bans`);
   console.log(`   User: ${(req as any).userId}`);
   console.log(`   Guild: ${guildId || 'none'}`);
 
-  const mockBans = {
-    '1': [{ id: 1, user: 'User3', reason: 'Toxic' }],
-    '2': [],
-  };
-  const result = (mockBans as any)[guildId] || [];
-  console.log(`✅ API Success: Returned ${result.length} ban records`);
-  res.json(result);
+  try {
+    const response = await axios.get(`https://discord.com/api/guilds/${guildId}/bans`, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+      },
+    });
+
+    const result = response.data.map((ban: any) => ({
+      id: ban.user.id,
+      user: ban.user.username,
+      reason: ban.reason || 'No reason provided',
+    }));
+
+    console.log(`✅ API Success: Returned ${result.length} ban records`);
+    res.json(result);
+  } catch (e) {
+    console.error(`❌ API Error in GET /api/bans: ${e}`);
+    // Fallback to empty array if Discord API fails
+    res.json([]);
+  }
+});
+
+app.post('/api/bans', auth, async (req, res) => {
+  const { guildId, userId, reason } = req.body;
+  console.log(`🚫 API Request: POST /api/bans`);
+  console.log(`   User: ${(req as any).userId}`);
+  console.log(`   Guild: ${guildId}`);
+  console.log(`   Target User: ${userId}`);
+  console.log(`   Reason: ${reason || 'No reason provided'}`);
+
+  try {
+    await axios.put(`https://discord.com/api/guilds/${guildId}/bans/${userId}`, {
+      reason: reason || 'No reason provided',
+    }, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log(`✅ API Success: User ${userId} banned from guild ${guildId}`);
+    res.json({ success: true, message: 'User banned successfully' });
+  } catch (e) {
+    console.error(`❌ API Error in POST /api/bans: ${e}`);
+    res.status(500).json({ error: 'Failed to ban user' });
+  }
+});
+
+app.delete('/api/bans', auth, async (req, res) => {
+  const { guildId, userId } = req.body;
+  console.log(`🚫 API Request: DELETE /api/bans`);
+  console.log(`   User: ${(req as any).userId}`);
+  console.log(`   Guild: ${guildId}`);
+  console.log(`   Target User: ${userId}`);
+
+  try {
+    await axios.delete(`https://discord.com/api/guilds/${guildId}/bans/${userId}`, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+      },
+    });
+
+    console.log(`✅ API Success: User ${userId} unbanned from guild ${guildId}`);
+    res.json({ success: true, message: 'User unbanned successfully' });
+  } catch (e) {
+    console.error(`❌ API Error in DELETE /api/bans: ${e}`);
+    res.status(500).json({ error: 'Failed to unban user' });
+  }
 });
 
 app.get('/api/warns', auth, (req, res) => {
@@ -270,6 +331,10 @@ app.get('/api/roles', auth, async (req, res) => {
       id: role.id,
       name: role.name,
       color: `#${role.color.toString(16).padStart(6, '0')}`,
+      permissions: role.permissions,
+      position: role.position,
+      mentionable: role.mentionable,
+      hoist: role.hoist,
     }));
 
     console.log(`✅ API Success: Returned ${result.length} role records`);
@@ -283,6 +348,131 @@ app.get('/api/roles', auth, async (req, res) => {
     };
     const result = (mockRoles as any)[guildId] || [];
     res.json(result);
+  }
+});
+
+app.post('/api/roles', auth, async (req, res) => {
+  const { guildId, name, color, permissions, mentionable, hoist } = req.body;
+  console.log(`👥 API Request: POST /api/roles`);
+  console.log(`   User: ${(req as any).userId}`);
+  console.log(`   Guild: ${guildId}`);
+  console.log(`   Name: ${name}`);
+
+  try {
+    const roleData: any = { name };
+    if (color) roleData.color = parseInt(color.replace('#', ''), 16);
+    if (permissions !== undefined) roleData.permissions = permissions;
+    if (mentionable !== undefined) roleData.mentionable = mentionable;
+    if (hoist !== undefined) roleData.hoist = hoist;
+
+    const response = await axios.post(`https://discord.com/api/guilds/${guildId}/roles`, roleData, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log(`✅ API Success: Role created in guild ${guildId}`);
+    res.json({ success: true, role: response.data });
+  } catch (e) {
+    console.error(`❌ API Error in POST /api/roles: ${e}`);
+    res.status(500).json({ error: 'Failed to create role' });
+  }
+});
+
+app.patch('/api/roles/:roleId', auth, async (req, res) => {
+  const { roleId } = req.params;
+  const { guildId, name, color, permissions, mentionable, hoist } = req.body;
+  console.log(`👥 API Request: PATCH /api/roles/${roleId}`);
+  console.log(`   User: ${(req as any).userId}`);
+  console.log(`   Guild: ${guildId}`);
+
+  try {
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (color) updateData.color = parseInt(color.replace('#', ''), 16);
+    if (permissions !== undefined) updateData.permissions = permissions;
+    if (mentionable !== undefined) updateData.mentionable = mentionable;
+    if (hoist !== undefined) updateData.hoist = hoist;
+
+    const response = await axios.patch(`https://discord.com/api/guilds/${guildId}/roles/${roleId}`, updateData, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log(`✅ API Success: Role ${roleId} updated in guild ${guildId}`);
+    res.json({ success: true, role: response.data });
+  } catch (e) {
+    console.error(`❌ API Error in PATCH /api/roles: ${e}`);
+    res.status(500).json({ error: 'Failed to update role' });
+  }
+});
+
+app.delete('/api/roles/:roleId', auth, async (req, res) => {
+  const { roleId } = req.params;
+  const { guildId } = req.body;
+  console.log(`👥 API Request: DELETE /api/roles/${roleId}`);
+  console.log(`   User: ${(req as any).userId}`);
+  console.log(`   Guild: ${guildId}`);
+
+  try {
+    await axios.delete(`https://discord.com/api/guilds/${guildId}/roles/${roleId}`, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+      },
+    });
+
+    console.log(`✅ API Success: Role ${roleId} deleted from guild ${guildId}`);
+    res.json({ success: true, message: 'Role deleted successfully' });
+  } catch (e) {
+    console.error(`❌ API Error in DELETE /api/roles: ${e}`);
+    res.status(500).json({ error: 'Failed to delete role' });
+  }
+});
+
+app.put('/api/members/:userId/roles/:roleId', auth, async (req, res) => {
+  const { userId, roleId } = req.params;
+  const { guildId } = req.body;
+  console.log(`👤 API Request: PUT /api/members/${userId}/roles/${roleId}`);
+  console.log(`   User: ${(req as any).userId}`);
+  console.log(`   Guild: ${guildId}`);
+
+  try {
+    await axios.put(`https://discord.com/api/guilds/${guildId}/members/${userId}/roles/${roleId}`, {}, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+      },
+    });
+
+    console.log(`✅ API Success: Role ${roleId} assigned to user ${userId} in guild ${guildId}`);
+    res.json({ success: true, message: 'Role assigned successfully' });
+  } catch (e) {
+    console.error(`❌ API Error in PUT /api/members/roles: ${e}`);
+    res.status(500).json({ error: 'Failed to assign role' });
+  }
+});
+
+app.delete('/api/members/:userId/roles/:roleId', auth, async (req, res) => {
+  const { userId, roleId } = req.params;
+  const { guildId } = req.body;
+  console.log(`👤 API Request: DELETE /api/members/${userId}/roles/${roleId}`);
+  console.log(`   User: ${(req as any).userId}`);
+  console.log(`   Guild: ${guildId}`);
+
+  try {
+    await axios.delete(`https://discord.com/api/guilds/${guildId}/members/${userId}/roles/${roleId}`, {
+      headers: {
+        Authorization: `Bot ${botToken}`,
+      },
+    });
+
+    console.log(`✅ API Success: Role ${roleId} revoked from user ${userId} in guild ${guildId}`);
+    res.json({ success: true, message: 'Role revoked successfully' });
+  } catch (e) {
+    console.error(`❌ API Error in DELETE /api/members/roles: ${e}`);
+    res.status(500).json({ error: 'Failed to revoke role' });
   }
 });
 
