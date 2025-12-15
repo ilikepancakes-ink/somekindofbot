@@ -17,9 +17,21 @@ const sessions: { [key: string]: { userId: string } } = {};
 
 // Auth middleware
 const auth = (req: any, res: any, next: any) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token || !sessions[token]) return res.status(401).send('Unauthorized');
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split(' ')[1];
+
+  console.log(`🔐 Auth Check for ${req.method} ${req.path}:`);
+  console.log(`   Auth Header: ${authHeader ? '[PRESENT]' : 'MISSING'}`);
+  console.log(`   Extracted Token: ${token ? token.substring(0, 20) + '...' : 'NONE'}`);
+  console.log(`   Token in Sessions: ${token && sessions[token] ? '✅ YES' : '❌ NO'}`);
+
+  if (!token || !sessions[token]) {
+    console.warn(`🚫 Auth failed for ${req.method} ${req.path}`);
+    return res.status(401).send('Unauthorized');
+  }
+
   req.userId = sessions[token].userId;
+  console.log(`✅ Auth success: User ${req.userId}`);
   next();
 };
 

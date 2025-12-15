@@ -154,6 +154,8 @@ class _ManagementScreenState extends State<ManagementScreen> {
   List<Map<String, dynamic>> servers = [];
   String? selectedServerId;
   Timer? _refreshTimer;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -262,26 +264,74 @@ class _ManagementScreenState extends State<ManagementScreen> {
     final headers = {'Authorization': 'Bearer ${widget.token}'};
 
     try {
+      print('🌐 Loading servers from API...');
       final res = await http.get(Uri.parse('$baseUrl/api/guilds'), headers: headers);
       servers = List<Map<String, dynamic>>.from(jsonDecode(res.body));
       if (servers.isNotEmpty) {
         selectedServerId = servers[0]['id'];
       }
+      _isLoading = false;
+      _errorMessage = null;
+      print('✅ Successfully loaded ${servers.length} servers');
       setState(() {});
     } catch (e) {
       print('❌ API Error in _loadServers: $e');
       print('   URL: $baseUrl/api/guilds');
       print('   Token: ${widget.token.substring(0, 20)}...');
+
+      _isLoading = false;
+      _errorMessage = 'Failed to load servers. Please check your connection and try again.';
+      setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (servers.isEmpty) {
+    // Show loading spinner while initially loading
+    if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
+
+    // Show error message if loading failed
+    if (_errorMessage != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _errorMessage = null;
+                  });
+                  _loadServers();
+                },
+                child: const Text('Retry'),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () {
+                  // Go back to login screen
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (_) => const HomePage()),
+                  );
+                },
+                child: const Text('Back to Login'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show main interface if servers loaded successfully
     return Column(
       children: [
         Padding(
