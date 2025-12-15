@@ -276,9 +276,13 @@ class _ManagementScreenState extends State<ManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _loadServers();
-    _loadData();
+    _initializeData();
     _startAutoRefresh();
+  }
+
+  Future<void> _initializeData() async {
+    await _loadServers();
+    _loadData();
   }
 
   @override
