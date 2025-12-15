@@ -7,7 +7,8 @@ module.exports = {
     .addUserOption(option =>
       option.setName('user')
         .setDescription('The user to get info about (leave empty for yourself)')
-        .setRequired(false)),
+        .setRequired(false))
+    .setDMPermission(true),
 
   async execute(interaction: any) {
     const user = interaction.options.getUser('user') || interaction.user;

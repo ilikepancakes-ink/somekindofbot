@@ -3,7 +3,8 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('help')
-    .setDescription('Shows available commands'),
+    .setDescription('Shows available commands')
+    .setDMPermission(true),
 
   async execute(interaction: any) {
     const commands = interaction.client.commands;
