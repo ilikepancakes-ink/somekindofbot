@@ -3,6 +3,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { getSession, setSession, deleteExpiredSessions } from './database';
 
 const app = express();
 app.use(express.json());
@@ -13,27 +14,35 @@ const clientSecret = process.env.DISCORD_CLIENT_SECRET!;
 const botToken = process.env.DISCORD_TOKEN!;
 const botAdminUserId = process.env.BOT_ADMIN_USER_ID!;
 
-// Simple in-memory session store (use database in production)
-const sessions: { [key: string]: { userId: string } } = {};
-
 // Auth middleware
-const auth = (req: any, res: any, next: any) => {
+const auth = async (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(' ')[1];
 
   console.log(`🔐 Auth Check for ${req.method} ${req.path}:`);
   console.log(`   Auth Header: ${authHeader ? '[PRESENT]' : 'MISSING'}`);
   console.log(`   Extracted Token: ${token ? token.substring(0, 20) + '...' : 'NONE'}`);
-  console.log(`   Token in Sessions: ${token && sessions[token] ? '✅ YES' : '❌ NO'}`);
 
-  if (!token || !sessions[token]) {
-    console.warn(`🚫 Auth failed for ${req.method} ${req.path}`);
+  if (!token) {
+    console.warn(`🚫 Auth failed for ${req.method} ${req.path}: No token`);
     return res.status(401).send('Unauthorized');
   }
 
-  req.userId = sessions[token].userId;
-  console.log(`✅ Auth success: User ${req.userId}`);
-  next();
+  try {
+    const session = await getSession(token);
+    if (!session) {
+      console.warn(`🚫 Auth failed for ${req.method} ${req.path}: Session not found`);
+      return res.status(401).send('Unauthorized');
+    }
+
+    req.userId = session.user_id;
+    req.deviceId = session.device_id;
+    console.log(`✅ Auth success: User ${req.userId}, Device ${req.deviceId}`);
+    next();
+  } catch (e) {
+    console.error(`❌ Auth error: ${e}`);
+    res.status(500).send('Auth error');
+  }
 };
 
 app.get('/callback', async (req, res) => {
@@ -74,7 +83,12 @@ app.get('/callback', async (req, res) => {
 
     // Generate session token
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    sessions[sessionToken] = { userId };
+    await setSession({
+      token: sessionToken,
+      user_id: userId,
+      device_id: 'unknown', // TODO: get from app
+      created_at: Date.now(),
+    });
 
     // Redirect to app
     res.redirect(`somekindofbot://callback?token=${sessionToken}`);
@@ -85,22 +99,28 @@ app.get('/callback', async (req, res) => {
 });
 
 // Optional: endpoint to validate token
-app.get('/validate', (req, res) => {
+app.get('/validate', async (req, res) => {
   const token = req.query.token as string;
-  if (sessions[token]) {
-    res.json({ valid: true, userId: sessions[token].userId });
-  } else {
-    res.json({ valid: false });
+  try {
+    const session = await getSession(token);
+    if (session) {
+      res.json({ valid: true, userId: session.user_id });
+    } else {
+      res.json({ valid: false });
+    }
+  } catch (e) {
+    res.status(500).json({ error: 'Validation error' });
   }
 });
 
 // Endpoint for bot to generate auth tokens for admin users only
-app.post('/api/generate-token', (req, res) => {
-  const { userId } = req.body;
+app.post('/api/generate-token', async (req, res) => {
+  const { userId, deviceId } = req.body;
 
   // Detailed logging for server-side admin check
   console.log(`🔐 Server Admin Check:`);
   console.log(`   Received User ID: ${userId}`);
+  console.log(`   Received Device ID: ${deviceId}`);
   console.log(`   Server Admin ID: ${botAdminUserId || 'NOT SET'}`);
   console.log(`   Server Match: ${userId === botAdminUserId ? '✅ YES' : '❌ NO'}`);
 
@@ -122,7 +142,12 @@ app.post('/api/generate-token', (req, res) => {
 
   // Generate session token for the user
   const sessionToken = crypto.randomBytes(32).toString('hex');
-  sessions[sessionToken] = { userId };
+  await setSession({
+    token: sessionToken,
+    user_id: userId,
+    device_id: deviceId || 'unknown',
+    created_at: Date.now(),
+  });
 
   res.json({
     success: true,

@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_links/app_links.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 
 void main() {
   runApp(const MyApp());
@@ -37,12 +42,85 @@ class _HomePageState extends State<HomePage> {
   String? _token;
   StreamSubscription<Uri?>? _sub;
   final _appLinks = AppLinks();
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  Database? _database;
+  String? _deviceId;
 
   @override
   void initState() {
     super.initState();
+    _initApp();
     _handleIncomingLinks();
     _handleInitialLink();
+  }
+
+  Future<void> _initApp() async {
+    await _initDatabase();
+    await _loadDeviceId();
+    await _loadToken();
+  }
+
+  Future<void> _initDatabase() async {
+    final databasesPath = await getDatabasesPath();
+    final path = join(databasesPath, 'tokens.db');
+    _database = await openDatabase(
+      path,
+      version: 1,
+      onCreate: (db, version) {
+        return db.execute(
+          'CREATE TABLE tokens (device_id TEXT PRIMARY KEY, token TEXT)',
+        );
+      },
+    );
+  }
+
+  Future<void> _loadDeviceId() async {
+    final deviceInfo = DeviceInfoPlugin();
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      _deviceId = iosInfo.identifierForVendor;
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
+      final androidInfo = await deviceInfo.androidInfo;
+      _deviceId = androidInfo.id;
+    } else if (defaultTargetPlatform == TargetPlatform.windows) {
+      final windowsInfo = await deviceInfo.windowsInfo;
+      _deviceId = windowsInfo.deviceId;
+    } else if (defaultTargetPlatform == TargetPlatform.linux) {
+      final linuxInfo = await deviceInfo.linuxInfo;
+      _deviceId = linuxInfo.machineId;
+    } else {
+      _deviceId = 'unknown';
+    }
+  }
+
+  Future<void> _loadToken() async {
+    // First try secure storage
+    String? token = await _secureStorage.read(key: 'auth_token');
+    if (token == null && _database != null) {
+      // Fallback to DB
+      final maps = await _database!.query('tokens', where: 'device_id = ?', whereArgs: [_deviceId]);
+      if (maps.isNotEmpty) {
+        token = maps.first['token'] as String?;
+      }
+    }
+    if (token != null) {
+      setState(() {
+        _token = token;
+      });
+    }
+  }
+
+  Future<void> _saveToken(String token) async {
+    // Save to secure storage
+    await _secureStorage.write(key: 'auth_token', value: token);
+    // Also save to DB for persistence
+    if (_database != null && _deviceId != null) {
+      await _database!.insert(
+        'tokens',
+        {'device_id': _deviceId, 'token': token},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
   }
 
   @override
@@ -70,10 +148,11 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _handleLink(Uri uri) {
+  void _handleLink(Uri uri) async {
     if (uri.scheme == 'somekindofbot' && uri.host == 'callback') {
       final token = uri.queryParameters['token'];
       if (token != null) {
+        await _saveToken(token);
         setState(() {
           _token = token;
         });
@@ -125,10 +204,11 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _loginWithToken() {
+  void _loginWithToken() async {
     final token = _tokenController.text.trim();
     if (token.isEmpty) return;
 
+    await _saveToken(token);
     setState(() {
       _token = token;
     });
