@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'token_storage.dart';
 
 void main() {
   runApp(const MyApp());
@@ -37,10 +38,12 @@ class _HomePageState extends State<HomePage> {
   String? _token;
   StreamSubscription<Uri?>? _sub;
   final _appLinks = AppLinks();
+  bool _isLoadingToken = true;
 
   @override
   void initState() {
     super.initState();
+    _loadSavedToken();
     _handleIncomingLinks();
     _handleInitialLink();
   }
@@ -49,6 +52,24 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _sub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _loadSavedToken() async {
+    try {
+      final savedToken = await TokenStorage.getToken();
+      if (savedToken != null) {
+        setState(() {
+          _token = savedToken;
+        });
+        print('✅ Loaded saved token from secure storage');
+      }
+    } catch (e) {
+      print('⚠️ Failed to load saved token: $e');
+    } finally {
+      setState(() {
+        _isLoadingToken = false;
+      });
+    }
   }
 
   void _handleIncomingLinks() {
@@ -83,6 +104,12 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingToken) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Bot Management'),
@@ -125,13 +152,24 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _loginWithToken() {
+  Future<void> _loginWithToken() async {
     final token = _tokenController.text.trim();
     if (token.isEmpty) return;
 
-    setState(() {
-      _token = token;
-    });
+    try {
+      // Save token securely
+      await TokenStorage.saveToken(token);
+      print('✅ Token saved securely');
+
+      setState(() {
+        _token = token;
+      });
+    } catch (e) {
+      print('❌ Failed to save token: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save token securely')),
+      );
+    }
   }
 }
 
@@ -144,7 +182,7 @@ class ManagementScreen extends StatefulWidget {
   _ManagementScreenState createState() => _ManagementScreenState();
 }
 
-class _ManagementScreenState extends State<ManagementScreen> {
+class _ManagementScreenState extends State<ManagementScreen> with TickerProviderStateMixin {
   List<Map<String, dynamic>> timeouts = [];
   List<Map<String, dynamic>> bans = [];
   List<Map<String, dynamic>> warns = [];
@@ -156,12 +194,20 @@ class _ManagementScreenState extends State<ManagementScreen> {
   Timer? _refreshTimer;
   bool _isLoading = true;
   String? _errorMessage;
+  late TabController _tabController;
+  bool _isLoadingTimeouts = false;
+  bool _isLoadingBans = false;
+  bool _isLoadingWarns = false;
+  bool _isLoadingRoles = false;
+  bool _isLoadingMembers = false;
+  bool _isLoadingEnvVars = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 7, vsync: this);
+    _tabController.addListener(_handleTabChange);
     _loadServers();
-    _loadData();
     _setupTouchBar();
     _startAutoRefresh();
   }
@@ -176,7 +222,8 @@ class _ManagementScreenState extends State<ManagementScreen> {
     // Refresh server data every 30 seconds
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _loadServers();
-      _loadData();
+      // Refresh current tab data
+      _handleTabChange();
     });
   }
 
@@ -195,7 +242,14 @@ class _ManagementScreenState extends State<ManagementScreen> {
           setState(() {
             selectedServerId = serverId;
           });
-          _loadData();
+          // Clear all data and reload current tab
+          timeouts.clear();
+          bans.clear();
+          warns.clear();
+          roles.clear();
+          members.clear();
+          envVars.clear();
+          _handleTabChange();
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Server switched to $serverId from Touch Bar')));
           break;
         case 'updateBot':
@@ -269,6 +323,8 @@ class _ManagementScreenState extends State<ManagementScreen> {
       servers = List<Map<String, dynamic>>.from(jsonDecode(res.body));
       if (servers.isNotEmpty) {
         selectedServerId = servers[0]['id'];
+        // Load initial tab data
+        _handleTabChange();
       }
       _isLoading = false;
       _errorMessage = null;
@@ -282,6 +338,140 @@ class _ManagementScreenState extends State<ManagementScreen> {
       _isLoading = false;
       _errorMessage = 'Failed to load servers. Please check your connection and try again.';
       setState(() {});
+    }
+  }
+
+  void _handleTabChange() {
+    final tabIndex = _tabController.index;
+    switch (tabIndex) {
+      case 0: // Timeouts
+        _loadTimeouts();
+        break;
+      case 1: // Bans
+        _loadBans();
+        break;
+      case 2: // Warns
+        _loadWarns();
+        break;
+      case 3: // Roles
+        _loadRoles();
+        break;
+      case 4: // Members
+        _loadMembers();
+        break;
+      case 5: // Env Vars
+        _loadEnvVars();
+        break;
+      case 6: // Actions
+        // No data to load
+        break;
+    }
+  }
+
+  Future<void> _loadTimeouts() async {
+    if (_isLoadingTimeouts) return;
+    setState(() => _isLoadingTimeouts = true);
+    const baseUrl = 'https://discordbot.0x409.nl';
+    final headers = {'Authorization': 'Bearer ${widget.token}'};
+    final guildParam = selectedServerId != null ? '?guildId=$selectedServerId' : '';
+
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/timeouts$guildParam'), headers: headers);
+      timeouts = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+      setState(() {});
+    } catch (e) {
+      print('❌ API Error in _loadTimeouts: $e');
+    } finally {
+      setState(() => _isLoadingTimeouts = false);
+    }
+  }
+
+  Future<void> _loadBans() async {
+    if (_isLoadingBans) return;
+    setState(() => _isLoadingBans = true);
+    const baseUrl = 'https://discordbot.0x409.nl';
+    final headers = {'Authorization': 'Bearer ${widget.token}'};
+    final guildParam = selectedServerId != null ? '?guildId=$selectedServerId' : '';
+
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/bans$guildParam'), headers: headers);
+      bans = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+      setState(() {});
+    } catch (e) {
+      print('❌ API Error in _loadBans: $e');
+    } finally {
+      setState(() => _isLoadingBans = false);
+    }
+  }
+
+  Future<void> _loadWarns() async {
+    if (_isLoadingWarns) return;
+    setState(() => _isLoadingWarns = true);
+    const baseUrl = 'https://discordbot.0x409.nl';
+    final headers = {'Authorization': 'Bearer ${widget.token}'};
+    final guildParam = selectedServerId != null ? '?guildId=$selectedServerId' : '';
+
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/warns$guildParam'), headers: headers);
+      warns = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+      setState(() {});
+    } catch (e) {
+      print('❌ API Error in _loadWarns: $e');
+    } finally {
+      setState(() => _isLoadingWarns = false);
+    }
+  }
+
+  Future<void> _loadRoles() async {
+    if (_isLoadingRoles) return;
+    setState(() => _isLoadingRoles = true);
+    const baseUrl = 'https://discordbot.0x409.nl';
+    final headers = {'Authorization': 'Bearer ${widget.token}'};
+    final guildParam = selectedServerId != null ? '?guildId=$selectedServerId' : '';
+
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/roles$guildParam'), headers: headers);
+      roles = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+      setState(() {});
+    } catch (e) {
+      print('❌ API Error in _loadRoles: $e');
+    } finally {
+      setState(() => _isLoadingRoles = false);
+    }
+  }
+
+  Future<void> _loadMembers() async {
+    if (_isLoadingMembers) return;
+    setState(() => _isLoadingMembers = true);
+    const baseUrl = 'https://discordbot.0x409.nl';
+    final headers = {'Authorization': 'Bearer ${widget.token}'};
+    final guildParam = selectedServerId != null ? '?guildId=$selectedServerId' : '';
+
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/members$guildParam'), headers: headers);
+      members = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+      setState(() {});
+    } catch (e) {
+      print('❌ API Error in _loadMembers: $e');
+    } finally {
+      setState(() => _isLoadingMembers = false);
+    }
+  }
+
+  Future<void> _loadEnvVars() async {
+    if (_isLoadingEnvVars) return;
+    setState(() => _isLoadingEnvVars = true);
+    const baseUrl = 'https://discordbot.0x409.nl';
+    final headers = {'Authorization': 'Bearer ${widget.token}'};
+
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/env'), headers: headers);
+      envVars = List<Map<String, dynamic>>.from(jsonDecode(res.body));
+      setState(() {});
+    } catch (e) {
+      print('❌ API Error in _loadEnvVars: $e');
+    } finally {
+      setState(() => _isLoadingEnvVars = false);
     }
   }
 
@@ -352,7 +542,14 @@ class _ManagementScreenState extends State<ManagementScreen> {
               setState(() {
                 selectedServerId = value;
               });
-              _loadData();
+              // Clear all data and reload current tab
+              timeouts.clear();
+              bans.clear();
+              warns.clear();
+              roles.clear();
+              members.clear();
+              envVars.clear();
+              _handleTabChange();
             },
             items: servers.map((server) {
               return DropdownMenuItem<String>(
@@ -363,34 +560,33 @@ class _ManagementScreenState extends State<ManagementScreen> {
           ),
         ),
         Expanded(
-          child: DefaultTabController(
-            length: 7,
-            child: Scaffold(
-              appBar: AppBar(
-                title: const Text('Bot Management'),
-                bottom: const TabBar(
-                  tabs: [
-                    Tab(text: 'Timeouts'),
-                    Tab(text: 'Bans'),
-                    Tab(text: 'Warns'),
-                    Tab(text: 'Roles'),
-                    Tab(text: 'Members'),
-                    Tab(text: 'Env Vars'),
-                    Tab(text: 'Actions'),
-                  ],
-                ),
-              ),
-              body: TabBarView(
-                children: [
-                  _buildList('Timeouts', timeouts),
-                  _buildList('Bans', bans),
-                  _buildList('Warns', warns),
-                  _buildList('Roles', roles, editable: true),
-                  _buildList('Members', members),
-                  _buildEnvList(),
-                  _buildActions(),
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Bot Management'),
+              bottom: TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'Timeouts'),
+                  Tab(text: 'Bans'),
+                  Tab(text: 'Warns'),
+                  Tab(text: 'Roles'),
+                  Tab(text: 'Members'),
+                  Tab(text: 'Env Vars'),
+                  Tab(text: 'Actions'),
                 ],
               ),
+            ),
+            body: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildList('Timeouts', timeouts, isLoading: _isLoadingTimeouts),
+                _buildList('Bans', bans, isLoading: _isLoadingBans),
+                _buildList('Warns', warns, isLoading: _isLoadingWarns),
+                _buildList('Roles', roles, editable: true, isLoading: _isLoadingRoles),
+                _buildList('Members', members, isLoading: _isLoadingMembers),
+                _buildEnvList(isLoading: _isLoadingEnvVars),
+                _buildActions(),
+              ],
             ),
           ),
         ),
@@ -398,7 +594,10 @@ class _ManagementScreenState extends State<ManagementScreen> {
     );
   }
 
-  Widget _buildList(String title, List<Map<String, dynamic>> items, {bool editable = false}) {
+  Widget _buildList(String title, List<Map<String, dynamic>> items, {bool editable = false, bool isLoading = false}) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return ListView.builder(
       itemCount: items.length,
       itemBuilder: (context, index) {
@@ -427,7 +626,10 @@ class _ManagementScreenState extends State<ManagementScreen> {
     );
   }
 
-  Widget _buildEnvList() {
+  Widget _buildEnvList({bool isLoading = false}) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return ListView.builder(
       itemCount: envVars.length,
       itemBuilder: (context, index) {
@@ -469,7 +671,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
                   body: jsonEncode({'key': item['key'], 'value': item['value']}),
                 );
                 Navigator.pop(context);
-                _loadData();
+                _handleTabChange();
               } catch (e) {
                 print('❌ API Error in _editEnv: $e');
                 print('   Key: ${item['key']}');
@@ -527,7 +729,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
                   }),
                 );
                 Navigator.pop(context);
-                _loadData();
+                _handleTabChange();
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Role updated successfully')));
               } catch (e) {
                 print('❌ API Error in _editRole: $e');
@@ -567,7 +769,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
                   }),
                 );
                 Navigator.pop(context);
-                _loadData();
+                _handleTabChange();
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User unbanned successfully')));
               } catch (e) {
                 print('❌ API Error in _unbanUser: $e');
