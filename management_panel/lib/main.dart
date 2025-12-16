@@ -10,7 +10,8 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
+import 'package:path/path.dart' as p;
+import 'package:local_auth/local_auth.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/settings_provider.dart';
 
@@ -73,6 +74,7 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription<Uri?>? _sub;
   final _appLinks = AppLinks();
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final LocalAuthentication _localAuth = LocalAuthentication();
   Database? _database;
   String? _deviceId;
 
@@ -92,7 +94,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _initDatabase() async {
     final databasesPath = await getDatabasesPath();
-    final path = join(databasesPath, 'tokens.db');
+    final path = p.join(databasesPath, 'tokens.db');
     _database = await openDatabase(
       path,
       version: 1,
@@ -134,9 +136,47 @@ class _HomePageState extends State<HomePage> {
       }
     }
     if (token != null) {
-      setState(() {
-        _token = token;
-      });
+      // On macOS and iOS, require biometric authentication before using existing token
+      if (defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.iOS) {
+        try {
+          final canAuthenticateWithBiometrics = await _localAuth.canCheckBiometrics;
+          final canAuthenticate = canAuthenticateWithBiometrics || await _localAuth.isDeviceSupported();
+
+          if (canAuthenticate) {
+            final authenticated = await _localAuth.authenticate(
+              localizedReason: 'Authenticate to access your saved token',
+              options: const AuthenticationOptions(
+                biometricOnly: false, // Allow fallback to password
+                useErrorDialogs: true,
+                stickyAuth: true,
+              ),
+            );
+
+            if (authenticated) {
+              setState(() {
+                _token = token;
+              });
+            }
+            // If not authenticated, don't set _token (stay on login screen)
+          } else {
+            // If no biometrics available, still allow access (fallback)
+            setState(() {
+              _token = token;
+            });
+          }
+        } catch (e) {
+          // If authentication fails or is not available, still allow access
+          print('Biometric authentication failed or not available: $e');
+          setState(() {
+            _token = token;
+          });
+        }
+      } else {
+        // On other platforms, just set the token
+        setState(() {
+          _token = token;
+        });
+      }
     }
   }
 
@@ -270,6 +310,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
   String? selectedServerId;
   Timer? _refreshTimer;
   bool _isLoading = true;
+  bool _isRefreshing = false;
   String? _errorMessage;
   bool _touchBarSetup = false;
 
@@ -309,6 +350,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
           final serverId = call.arguments as String;
           setState(() {
             selectedServerId = serverId;
+            _isRefreshing = true;
           });
           _loadData();
           ScaffoldMessenger.of(buildContext).showSnackBar(SnackBar(content: Text('Server switched to $serverId from Touch Bar')));
@@ -365,12 +407,15 @@ class _ManagementScreenState extends State<ManagementScreen> {
       final res6 = await http.get(Uri.parse('$baseUrl/api/env'), headers: headers);
       envVars = List<Map<String, dynamic>>.from(jsonDecode(res6.body));
 
+      _isRefreshing = false;
       setState(() {});
     } catch (e) {
       print('❌ API Error in _loadData: $e');
       print('   URL: $baseUrl');
       print('   Guild: $selectedServerId');
       print('   Token: ${widget.token.substring(0, 20)}...');
+      _isRefreshing = false;
+      setState(() {});
     }
   }
 
@@ -461,23 +506,34 @@ class _ManagementScreenState extends State<ManagementScreen> {
       );
     }
 
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+    final isTablet = screenSize.width >= 600 && screenSize.width < 1200;
+    final isLargeScreen = screenSize.width >= 1200;
+
     // Show main interface if servers loaded successfully
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: EdgeInsets.all(isSmallScreen ? 4.0 : 8.0),
           child: DropdownButton<String>(
             value: selectedServerId,
             onChanged: (value) {
               setState(() {
                 selectedServerId = value;
+                _isRefreshing = true;
               });
               _loadData();
             },
             items: servers.map((server) {
               return DropdownMenuItem<String>(
                 value: server['id'],
-                child: Text(server['name']),
+                child: Text(
+                  server['name'],
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? 14 : isTablet ? 16 : 18,
+                  ),
+                ),
               );
             }).toList(),
           ),
@@ -487,22 +543,82 @@ class _ManagementScreenState extends State<ManagementScreen> {
             length: 7,
             child: Scaffold(
               appBar: AppBar(
-                title: Text(AppLocalizations.of(context)?.appTitle ?? 'Bot Management'),
+                title: Text(
+                  AppLocalizations.of(context)?.appTitle ?? 'Bot Management',
+                  style: TextStyle(
+                    fontSize: isSmallScreen ? 16 : isTablet ? 18 : 20,
+                  ),
+                ),
                 actions: [
                   IconButton(
+                    iconSize: isSmallScreen ? 20 : isTablet ? 24 : 28,
                     icon: const Icon(Icons.settings),
                     onPressed: () => _showSettingsDialog(context),
                   ),
                 ],
                 bottom: TabBar(
+                  isScrollable: isSmallScreen,
+                  labelPadding: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 8 : isTablet ? 12 : 16,
+                    vertical: isSmallScreen ? 4 : 8,
+                  ),
                   tabs: [
-                    Tab(text: AppLocalizations.of(context)?.timeoutsTab ?? 'Timeouts'),
-                    Tab(text: AppLocalizations.of(context)?.bansTab ?? 'Bans'),
-                    Tab(text: AppLocalizations.of(context)?.warnsTab ?? 'Warns'),
-                    Tab(text: AppLocalizations.of(context)?.rolesTab ?? 'Roles'),
-                    Tab(text: AppLocalizations.of(context)?.membersTab ?? 'Members'),
-                    Tab(text: AppLocalizations.of(context)?.envVarsTab ?? 'Env Vars'),
-                    Tab(text: AppLocalizations.of(context)?.actionsTab ?? 'Actions'),
+                    Tab(
+                      child: Text(
+                        AppLocalizations.of(context)?.timeoutsTab ?? 'Timeouts',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 12 : isTablet ? 14 : 16,
+                        ),
+                      ),
+                    ),
+                    Tab(
+                      child: Text(
+                        AppLocalizations.of(context)?.bansTab ?? 'Bans',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 12 : isTablet ? 14 : 16,
+                        ),
+                      ),
+                    ),
+                    Tab(
+                      child: Text(
+                        AppLocalizations.of(context)?.warnsTab ?? 'Warns',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 12 : isTablet ? 14 : 16,
+                        ),
+                      ),
+                    ),
+                    Tab(
+                      child: Text(
+                        AppLocalizations.of(context)?.rolesTab ?? 'Roles',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 12 : isTablet ? 14 : 16,
+                        ),
+                      ),
+                    ),
+                    Tab(
+                      child: Text(
+                        AppLocalizations.of(context)?.membersTab ?? 'Members',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 12 : isTablet ? 14 : 16,
+                        ),
+                      ),
+                    ),
+                    Tab(
+                      child: Text(
+                        AppLocalizations.of(context)?.envVarsTab ?? 'Env Vars',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 12 : isTablet ? 14 : 16,
+                        ),
+                      ),
+                    ),
+                    Tab(
+                      child: Text(
+                        AppLocalizations.of(context)?.actionsTab ?? 'Actions',
+                        style: TextStyle(
+                          fontSize: isSmallScreen ? 12 : isTablet ? 14 : 16,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -525,23 +641,47 @@ class _ManagementScreenState extends State<ManagementScreen> {
   }
 
   Widget _buildList(String title, List<Map<String, dynamic>> items, {bool editable = false}) {
+    if (_isRefreshing) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+    final isTablet = screenSize.width >= 600 && screenSize.width < 1200;
+
     return ListView.builder(
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
         return ListTile(
-          title: Text(item['user'] ?? item['name'] ?? 'Item ${item['id']}'),
-          subtitle: Text(item.toString()),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 12 : isTablet ? 16 : 20,
+            vertical: isSmallScreen ? 8 : 12,
+          ),
+          title: Text(
+            item['user'] ?? item['name'] ?? 'Item ${item['id']}',
+            style: TextStyle(
+              fontSize: isSmallScreen ? 14 : isTablet ? 16 : 18,
+            ),
+          ),
+          subtitle: Text(
+            item.toString(),
+            style: TextStyle(
+              fontSize: isSmallScreen ? 12 : isTablet ? 14 : 16,
+            ),
+          ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (editable)
                 IconButton(
+                  iconSize: isSmallScreen ? 18 : isTablet ? 22 : 24,
                   icon: const Icon(Icons.edit),
                   onPressed: () => _editRole(context, item),
                 ),
               if (title == 'Bans')
                 IconButton(
+                  iconSize: isSmallScreen ? 18 : isTablet ? 22 : 24,
                   icon: const Icon(Icons.undo),
                   tooltip: 'Unban',
                   onPressed: () => _unbanUser(context, item),
@@ -554,14 +694,33 @@ class _ManagementScreenState extends State<ManagementScreen> {
   }
 
   Widget _buildEnvList() {
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+    final isTablet = screenSize.width >= 600 && screenSize.width < 1200;
+
     return ListView.builder(
       itemCount: envVars.length,
       itemBuilder: (context, index) {
         final item = envVars[index];
         return ListTile(
-          title: Text(item['key']),
-          subtitle: Text(item['value']),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: isSmallScreen ? 12 : isTablet ? 16 : 20,
+            vertical: isSmallScreen ? 8 : 12,
+          ),
+          title: Text(
+            item['key'],
+            style: TextStyle(
+              fontSize: isSmallScreen ? 14 : isTablet ? 16 : 18,
+            ),
+          ),
+          subtitle: Text(
+            item['value'],
+            style: TextStyle(
+              fontSize: isSmallScreen ? 12 : isTablet ? 14 : 16,
+            ),
+          ),
           trailing: IconButton(
+            iconSize: isSmallScreen ? 18 : isTablet ? 22 : 24,
             icon: const Icon(Icons.edit),
             onPressed: () => _editEnv(context, item),
           ),
@@ -794,50 +953,72 @@ class _ManagementScreenState extends State<ManagementScreen> {
   }
 
   Widget _buildActions(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+    final isTablet = screenSize.width >= 600 && screenSize.width < 1200;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                const baseUrl = 'https://discordbot.0x409.nl';
-                await http.post(Uri.parse('$baseUrl/api/update'), headers: {'Authorization': 'Bearer ${widget.token}'});
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updating...')));
+          SizedBox(
+            width: isSmallScreen ? 150 : isTablet ? 200 : 250,
+            height: isSmallScreen ? 45 : isTablet ? 50 : 55,
+            child: ElevatedButton(
+              onPressed: () async {
+                try {
+                  const baseUrl = 'https://discordbot.0x409.nl';
+                  await http.post(Uri.parse('$baseUrl/api/update'), headers: {'Authorization': 'Bearer ${widget.token}'});
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Updating...')));
+                  }
+                } catch (e) {
+                  print('❌ API Error in _buildActions updateBot: $e');
+                  print('   URL: https://discordbot.0x409.nl/api/update');
+                  print('   Token: ${widget.token.substring(0, 20)}...');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update bot')));
+                  }
                 }
-              } catch (e) {
-                print('❌ API Error in _buildActions updateBot: $e');
-                print('   URL: https://discordbot.0x409.nl/api/update');
-                print('   Token: ${widget.token.substring(0, 20)}...');
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update bot')));
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            child: const Text('Update Bot'),
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                textStyle: TextStyle(
+                  fontSize: isSmallScreen ? 14 : isTablet ? 16 : 18,
+                ),
+              ),
+              child: const Text('Update Bot'),
+            ),
           ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                const baseUrl = 'https://discordbot.0x409.nl';
-                await http.post(Uri.parse('$baseUrl/api/restart'), headers: {'Authorization': 'Bearer ${widget.token}'});
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Restarting...')));
+          SizedBox(height: isSmallScreen ? 15 : 20),
+          SizedBox(
+            width: isSmallScreen ? 150 : isTablet ? 200 : 250,
+            height: isSmallScreen ? 45 : isTablet ? 50 : 55,
+            child: ElevatedButton(
+              onPressed: () async {
+                try {
+                  const baseUrl = 'https://discordbot.0x409.nl';
+                  await http.post(Uri.parse('$baseUrl/api/restart'), headers: {'Authorization': 'Bearer ${widget.token}'});
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Restarting...')));
+                  }
+                } catch (e) {
+                  print('❌ API Error in _buildActions restartBot: $e');
+                  print('   URL: https://discordbot.0x409.nl/api/restart');
+                  print('   Token: ${widget.token.substring(0, 20)}...');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to restart bot')));
+                  }
                 }
-              } catch (e) {
-                print('❌ API Error in _buildActions restartBot: $e');
-                print('   URL: https://discordbot.0x409.nl/api/restart');
-                print('   Token: ${widget.token.substring(0, 20)}...');
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to restart bot')));
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            child: const Text('Restart Bot'),
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                textStyle: TextStyle(
+                  fontSize: isSmallScreen ? 14 : isTablet ? 16 : 18,
+                ),
+              ),
+              child: const Text('Restart Bot'),
+            ),
           ),
         ],
       ),
