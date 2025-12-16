@@ -39,13 +39,14 @@ module.exports = {
         .addBooleanOption(option =>
           option.setName('ai_content').setDescription('Include AI-generated content (default: false)').setRequired(false)
         )
-    ),
+    )
+    .setDMPermission(true),
 
   async execute(interaction: any) {
-    // Check if channel is NSFW
-    if (!interaction.channel?.nsfw) {
+    // Check if channel is NSFW or if it's a DM
+    if (interaction.channel && !interaction.channel.nsfw && interaction.channel.type !== 1) { // 1 is DM
       return await interaction.reply({
-        content: 'This command can only be used in NSFW channels!',
+        content: 'This command can only be used in NSFW channels or DMs!',
         flags: 64
       });
     }

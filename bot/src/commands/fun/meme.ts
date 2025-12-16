@@ -4,7 +4,8 @@ import axios from 'axios';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('meme')
-    .setDescription('Get a random meme'),
+    .setDescription('Get a random meme')
+    .setDMPermission(true),
 
   async execute(interaction: any) {
     try {

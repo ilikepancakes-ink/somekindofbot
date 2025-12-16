@@ -317,9 +317,13 @@ class _ManagementScreenState extends State<ManagementScreen> {
   @override
   void initState() {
     super.initState();
-    _loadServers();
-    _loadData();
+    _initializeData();
     _startAutoRefresh();
+  }
+
+  Future<void> _initializeData() async {
+    await _loadServers();
+    _loadData();
   }
 
   @override
@@ -540,7 +544,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
         ),
         Expanded(
           child: DefaultTabController(
-            length: 7,
+            length: 8,
             child: Scaffold(
               appBar: AppBar(
                 title: Text(
@@ -619,6 +623,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
                         ),
                       ),
                     ),
+                    Tab(text: 'Status'),
                   ],
                 ),
               ),
@@ -631,6 +636,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
                   _buildList('Members', members),
                   _buildEnvList(),
                   _buildActions(context),
+                  _buildStatus(context),
                 ],
               ),
             ),
@@ -1023,5 +1029,96 @@ class _ManagementScreenState extends State<ManagementScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildStatus(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _checkStatuses(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } else if (snapshot.hasData) {
+          final statuses = snapshot.data!;
+          return ListView.builder(
+            itemCount: statuses.length,
+            itemBuilder: (context, index) {
+              final status = statuses[index];
+              return ListTile(
+                title: Text(status['name']),
+                subtitle: Text(status['ping'] != null ? '${status['ping']} ms' : 'N/A'),
+                trailing: Icon(
+                  status['status'] == 'online' ? Icons.check_circle : Icons.error,
+                  color: status['status'] == 'online' ? Colors.green : Colors.red,
+                ),
+              );
+            },
+          );
+        } else {
+          return const Center(child: Text('No data'));
+        }
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _checkStatuses() async {
+    List<Map<String, dynamic>> statuses = [];
+
+    // Ping endpoints
+    final endpoints = [
+      {'name': 'Bot Server API', 'url': 'https://discordbot.0x409.nl/api/guilds'},
+      {'name': 'Discord Gateway', 'url': 'https://discord.com/api/v10/gateway'},
+      {'name': 'Discord Status', 'url': 'https://discordstatus.com/api/v2/status.json'},
+      {'name': 'Own Router (Google DNS)', 'url': 'https://8.8.8.8'}, // Placeholder for own router
+    ];
+
+    for (final endpoint in endpoints) {
+      final start = DateTime.now().millisecondsSinceEpoch;
+      try {
+        final response = await http.get(Uri.parse(endpoint['url']!), headers: endpoint['url']!.contains('discordbot') ? {'Authorization': 'Bearer ${widget.token}'} : {});
+        final ping = DateTime.now().millisecondsSinceEpoch - start;
+        statuses.add({
+          'name': endpoint['name']!,
+          'status': response.statusCode == 200 ? 'online' : 'offline',
+          'ping': ping,
+        });
+      } catch (e) {
+        statuses.add({
+          'name': endpoint['name']!,
+          'status': 'offline',
+          'ping': null,
+        });
+      }
+    }
+
+    // Check Discord services
+    final discordServices = [
+      {'name': 'Discord.com', 'url': 'https://discord.com'},
+      {'name': 'Discord.gg', 'url': 'https://discord.gg'},
+    ];
+
+    for (final service in discordServices) {
+      final start = DateTime.now().millisecondsSinceEpoch;
+      try {
+        final response = await http.get(Uri.parse(service['url']!));
+        final ping = DateTime.now().millisecondsSinceEpoch - start;
+        statuses.add({
+          'name': service['name']!,
+          'status': response.statusCode == 200 ? 'online' : 'offline',
+          'ping': ping,
+        });
+      } catch (e) {
+        statuses.add({
+          'name': service['name']!,
+          'status': 'offline',
+          'ping': null,
+        });
+      }
+    }
+
+    // Check Discord Bot API (already included in endpoints)
+
+    return statuses;
   }
 }

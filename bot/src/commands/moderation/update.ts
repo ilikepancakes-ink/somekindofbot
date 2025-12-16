@@ -32,7 +32,16 @@ module.exports = {
       }
 
       console.log(`Bot updated: ${stdout}`);
-      await interaction.editReply({ content: `Bot updated successfully!\n\`\`\`\n${stdout}\n\`\`\`` });
+
+      try {
+        // Reload commands after update
+        const { loadCommands } = require('../../index');
+        await loadCommands();
+        await interaction.editReply({ content: `Bot updated and commands reloaded successfully!\n\`\`\`\n${stdout}\n\`\`\`` });
+      } catch (reloadError: any) {
+        console.error(`Error reloading commands: ${reloadError.message}`);
+        await interaction.editReply({ content: `Bot updated but failed to reload commands: ${reloadError.message}\n\`\`\`\n${stdout}\n\`\`\`` });
+      }
     });
   },
 };

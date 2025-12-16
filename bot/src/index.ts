@@ -21,43 +21,53 @@ const client = new Client({
 // Collection to store commands
 (client as any).commands = new Collection();
 
-async function main() {
-  try {
-    // Load commands
-    const commands: any[] = [];
-    const commandsPath = path.join(__dirname, 'commands');
-    const commandFolders = fs.readdirSync(commandsPath);
+async function loadCommands() {
+  const commands: any[] = [];
+  const commandsPath = path.join(__dirname, 'commands');
+  const commandFolders = fs.readdirSync(commandsPath);
 
-    for (const folder of commandFolders) {
-      const folderPath = path.join(commandsPath, folder);
-      const commandFiles = fs.readdirSync(folderPath).filter(file => file.endsWith('.js'));
+  // Clear existing commands
+  (client as any).commands.clear();
 
-      for (const file of commandFiles) {
-        const filePath = path.join(folderPath, file);
-        const command = require(filePath);
+  for (const folder of commandFolders) {
+    const folderPath = path.join(commandsPath, folder);
+    const commandFiles = fs.readdirSync(folderPath).filter(file => file.endsWith('.ts'));
 
-        if (command.data && command.execute) {
-          // Store the group (folder name) with the command
-          command.group = folder;
-          (client as any).commands.set(command.data.name, command);
-          commands.push(command.data.toJSON());
-        } else {
-          console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
-        }
+    for (const file of commandFiles) {
+      const filePath = path.join(folderPath, file);
+
+      // Clear require cache to reload the module
+      delete require.cache[require.resolve(filePath)];
+
+      const command = require(filePath);
+
+      if (command.data && command.execute) {
+        // Store the group (folder name) with the command
+        command.group = folder;
+        (client as any).commands.set(command.data.name, command);
+        commands.push(command.data.toJSON());
+      } else {
+        console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
       }
     }
+  }
 
-    // Register commands with Discord
-    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!);
+  // Register commands with Discord
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!);
 
-    console.log(`Started refreshing ${commands.length} application (/) commands.`);
+  console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
-    const data: any = await rest.put(
-      Routes.applicationCommands(process.env.DISCORD_CLIENT_ID!),
-      { body: commands },
-    );
+  const data: any = await rest.put(
+    Routes.applicationCommands(process.env.DISCORD_CLIENT_ID!),
+    { body: commands },
+  );
 
-    console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+  console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+}
+
+async function main() {
+  try {
+    await loadCommands();
 
     // Load events
     const eventsPath = path.join(__dirname, 'events');
@@ -83,3 +93,6 @@ async function main() {
 }
 
 main();
+
+// Export for external use (e.g., in update command)
+export { client, loadCommands };
