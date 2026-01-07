@@ -4,7 +4,8 @@ import axios from 'axios';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('generate-token')
-    .setDescription('Generate an auth token for the management panel'),
+    .setDescription('Generate an auth token for the management panel')
+    .setDMPermission(true),
 
   async execute(interaction: ChatInputCommandInteraction) {
     const userId = interaction.user.id;
