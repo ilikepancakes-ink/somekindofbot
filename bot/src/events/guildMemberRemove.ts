@@ -1,4 +1,5 @@
 import { Events, EmbedBuilder } from 'discord.js';
+import axios from 'axios';
 import * as path from 'path';
 const { getGuildStats } = require(path.join(__dirname, '../database'));
 
@@ -23,6 +24,29 @@ module.exports = {
           .setTimestamp();
 
         await channel.send({ embeds: [embed] });
+
+        // Send log to webhook
+        if (stats.log_webhook_url) {
+          const logEmbed = new EmbedBuilder()
+            .setTitle('👋 Member Left')
+            .setDescription(`${member.user.tag} left the server`)
+            .addFields(
+              { name: 'User', value: `${member.user}`, inline: true },
+              { name: 'User ID', value: member.user.id, inline: true },
+              { name: 'Joined At', value: member.joinedAt ? `<t:${Math.floor(member.joinedAt.getTime() / 1000)}:F>` : 'Unknown', inline: true }
+            )
+            .setColor(0xFF0000)
+            .setThumbnail(member.user.displayAvatarURL())
+            .setTimestamp();
+
+          try {
+            await axios.post(stats.log_webhook_url, {
+              embeds: [logEmbed.toJSON()]
+            });
+          } catch (logError) {
+            console.error('Error sending log to webhook:', logError);
+          }
+        }
       } catch (error) {
         console.error('Error sending goodbye message:', error);
       }

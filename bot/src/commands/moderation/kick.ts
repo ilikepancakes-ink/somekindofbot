@@ -12,9 +12,14 @@ module.exports = {
       option.setName('reason')
         .setDescription('The reason for the kick')
         .setRequired(false))
-    .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers),
+    .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
+    .setDMPermission(true),
 
   async execute(interaction: any) {
+    if (!interaction.guild) {
+      return await interaction.reply({ content: 'This command can only be used in a server.', flags: 64 });
+    }
+
     const target = interaction.options.getUser('target');
     const reason = interaction.options.getString('reason') || 'No reason provided';
 

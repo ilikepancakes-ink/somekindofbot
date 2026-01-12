@@ -28,7 +28,8 @@ module.exports = {
             .setDescription('The title for goodbye messages')
             .setRequired(true)
         )
-    ),
+    )
+    .setDMPermission(true),
 
   async execute(interaction: any) {
     const guild = interaction.guild;

@@ -3,9 +3,13 @@ import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('serverinfo')
-    .setDescription('Get information about the server'),
+    .setDescription('Get information about the server')
+    .setDMPermission(true),
 
   async execute(interaction: any) {
+    if (!interaction.guild) {
+      return await interaction.reply({ content: 'This command can only be used in a server.', flags: 64 });
+    }
     const guild = interaction.guild;
 
     const embed = new EmbedBuilder()

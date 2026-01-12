@@ -5,7 +5,8 @@ import { join } from 'path';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('update')
-    .setDescription('Update the bot to the latest version'),
+    .setDescription('Update the bot to the latest version')
+    .setDMPermission(true),
 
   async execute(interaction: any) {
     await interaction.deferReply({ ephemeral: true });

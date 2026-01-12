@@ -1,4 +1,5 @@
 import { Events, EmbedBuilder } from 'discord.js';
+import axios from 'axios';
 import * as path from 'path';
 const { getGuildStats } = require(path.join(__dirname, '../database'));
 
@@ -44,6 +45,28 @@ module.exports = {
           .setTimestamp();
 
         await channel.send({ embeds: [embed] });
+
+        // Send log to webhook
+        if (stats.log_webhook_url) {
+          const logEmbed = new EmbedBuilder()
+            .setTitle('👋 Member Joined')
+            .setDescription(`${member.user.tag} joined the server`)
+            .addFields(
+              { name: 'User', value: `${member.user}`, inline: true },
+              { name: 'User ID', value: member.user.id, inline: true },
+              { name: 'Account Created', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:F>`, inline: true }
+            )
+            .setColor(0x00FF00)
+            .setTimestamp();
+
+          try {
+            await axios.post(stats.log_webhook_url, {
+              embeds: [logEmbed.toJSON()]
+            });
+          } catch (logError) {
+            console.error('Error sending log to webhook:', logError);
+          }
+        }
       } catch (error) {
         console.error('Error sending welcome message:', error);
       }

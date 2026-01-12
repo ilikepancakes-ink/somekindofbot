@@ -3,7 +3,7 @@ import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('role')
-    .setDescription('Manage server roles')
+    .setDescription('Manage roles')
     .addSubcommand(subcommand =>
       subcommand
         .setName('create')
@@ -88,9 +88,13 @@ module.exports = {
           option.setName('role')
             .setDescription('The role to get info about')
             .setRequired(true)))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+    .setDMPermission(true),
 
   async execute(interaction: any) {
+    if (!interaction.guild) {
+      return await interaction.reply({ content: 'This command can only be used in a server.', flags: 64 });
+    }
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'create') {

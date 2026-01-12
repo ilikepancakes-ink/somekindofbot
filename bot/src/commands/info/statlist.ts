@@ -5,7 +5,8 @@ const { getGuildStats, setGuildStats } = require(path.join(__dirname, '../../dat
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('statlist')
-    .setDescription('creates a statist that shows at the top of the channel list'),
+    .setDescription('creates a statist that shows at the top of the channel list')
+    .setDMPermission(true),
 
   async execute(interaction: any) {
     const guild = interaction.guild;
