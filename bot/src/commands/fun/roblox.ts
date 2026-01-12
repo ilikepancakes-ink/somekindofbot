@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, InteractionContextType } from 'discord.js';
 import axios from 'axios';
 
 module.exports = {
@@ -21,7 +21,7 @@ module.exports = {
           option.setName('username')
             .setDescription('The Roblox username')
             .setRequired(true)))
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM]),
 
   async execute(interaction: any) {
     const subcommand = interaction.options.getSubcommand();

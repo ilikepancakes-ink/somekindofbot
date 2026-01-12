@@ -1,10 +1,10 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, InteractionContextType } from 'discord.js';
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('serverinfo')
     .setDescription('Get information about the server')
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild]),
 
   async execute(interaction: any) {
     if (!interaction.guild) {

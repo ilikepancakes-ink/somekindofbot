@@ -1,11 +1,11 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, InteractionContextType } from 'discord.js';
 import axios from 'axios';
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('meme')
     .setDescription('Get a random meme')
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM]),
 
   async execute(interaction: any) {
     try {

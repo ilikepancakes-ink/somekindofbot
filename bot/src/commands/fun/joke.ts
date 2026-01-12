@@ -1,11 +1,11 @@
-import { SlashCommandBuilder, InteractionReplyOptions } from 'discord.js';
+import { SlashCommandBuilder, InteractionReplyOptions, InteractionContextType } from 'discord.js';
 import axios from 'axios';
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('joke')
     .setDescription('Get a random joke')
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM]),
 
   async execute(interaction: any) {
     try {

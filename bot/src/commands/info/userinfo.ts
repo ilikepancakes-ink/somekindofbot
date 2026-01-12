@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, InteractionContextType } from 'discord.js';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,7 +8,7 @@ module.exports = {
       option.setName('user')
         .setDescription('The user to get info about (leave empty for yourself)')
         .setRequired(false))
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM]),
 
   async execute(interaction: any) {
     const user = interaction.options.getUser('user') || interaction.user;

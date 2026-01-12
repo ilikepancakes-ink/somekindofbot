@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, InteractionContextType } from 'discord.js';
 import axios from 'axios';
 
 export const rule34Data = new Map<string, { posts: any[], currentIndex: number }>();
@@ -40,7 +40,7 @@ module.exports = {
           option.setName('ai_content').setDescription('Include AI-generated content (default: false)').setRequired(false)
         )
     )
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM]),
 
   async execute(interaction: any) {
     // Check if channel is NSFW or if it's a DM

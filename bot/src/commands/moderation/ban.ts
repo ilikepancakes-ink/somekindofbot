@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, InteractionContextType } from 'discord.js';
 import axios from 'axios';
 import * as path from 'path';
 const { getGuildStats } = require(path.join(__dirname, '../../database'));
@@ -16,7 +16,7 @@ module.exports = {
         .setDescription('The reason for the ban')
         .setRequired(false))
     .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild]),
 
   async execute(interaction: any) {
     if (!interaction.guild) {

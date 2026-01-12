@@ -1,10 +1,10 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, InteractionContextType } from 'discord.js';
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('help')
     .setDescription('Shows available commands')
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM]),
 
   async execute(interaction: any) {
     const commands = interaction.client.commands;

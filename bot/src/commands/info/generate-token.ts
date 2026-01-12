@@ -1,11 +1,11 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, InteractionContextType } from 'discord.js';
 import axios from 'axios';
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('generate-token')
     .setDescription('Generate an auth token for the management panel')
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM]),
 
   async execute(interaction: ChatInputCommandInteraction) {
     const userId = interaction.user.id;
