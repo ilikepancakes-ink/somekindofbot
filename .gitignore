@@ -3,3 +3,7 @@ bot/dist/
 node_modules/
 bot/package-lock.json
 bot/node_modules/.package-lock.json
+*.DS_Store
+.vscode/
+.idea/
+*.db
