@@ -45,6 +45,22 @@ db.run(`ALTER TABLE guilds ADD COLUMN goodbye_title TEXT`, (err: any) => {
   }
 });
 
+// Ticket settings
+db.run(`CREATE TABLE IF NOT EXISTS ticket_settings (
+  guild_id TEXT PRIMARY KEY,
+  ping_role_id TEXT,
+  access_role_ids TEXT
+)`);
+
+// Tickets
+db.run(`CREATE TABLE IF NOT EXISTS tickets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT,
+  channel_id TEXT,
+  user_id TEXT,
+  created_at INTEGER
+)`);
+
 interface GuildStats {
   guild_id: string;
   member_channel_id?: string;
@@ -55,6 +71,20 @@ interface GuildStats {
   welcome_title?: string;
   goodbye_channel_id?: string;
   goodbye_title?: string;
+}
+
+interface TicketSettings {
+  guild_id: string;
+  ping_role_id?: string;
+  access_role_ids?: string;
+}
+
+interface Ticket {
+  id?: number;
+  guild_id: string;
+  channel_id: string;
+  user_id: string;
+  created_at: number;
 }
 
 function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
@@ -128,6 +158,59 @@ function deleteExpiredSessions(): Promise<void> {
   });
 }
 
+function getTicketSettings(guildId: string): Promise<TicketSettings | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM ticket_settings WHERE guild_id = ?', [guildId], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row as TicketSettings | undefined);
+    });
+  });
+}
+
+function setTicketSettings(settings: TicketSettings): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT OR REPLACE INTO ticket_settings (guild_id, ping_role_id, access_role_ids) VALUES (?, ?, ?)',
+      [settings.guild_id, settings.ping_role_id, settings.access_role_ids],
+      (err: any) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+function createTicket(ticket: Ticket): Promise<number> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO tickets (guild_id, channel_id, user_id, created_at) VALUES (?, ?, ?, ?)',
+      [ticket.guild_id, ticket.channel_id, ticket.user_id, ticket.created_at],
+      function(err: any) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      }
+    );
+  });
+}
+
+function getTicketByChannel(channelId: string): Promise<Ticket | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM tickets WHERE channel_id = ?', [channelId], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row as Ticket | undefined);
+    });
+  });
+}
+
+function deleteTicket(channelId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM tickets WHERE channel_id = ?', [channelId], (err: any) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
 export {
   getGuildStats,
   setGuildStats,
@@ -135,4 +218,9 @@ export {
   getSession,
   setSession,
   deleteExpiredSessions,
+  getTicketSettings,
+  setTicketSettings,
+  createTicket,
+  getTicketByChannel,
+  deleteTicket,
 };

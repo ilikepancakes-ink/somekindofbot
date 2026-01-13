@@ -1,5 +1,7 @@
-import { Events, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
+import { Events, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, PermissionFlagsBits, OverwriteType, ChannelType } from 'discord.js';
 import { rule34Data } from '../commands/nsfw/rule34';
+import * as path from 'path';
+const { getTicketSettings, createTicket } = require(path.join(__dirname, '../database'));
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -69,6 +71,83 @@ module.exports = {
           .addComponents(prevButton, nextButton, refreshButton);
 
         await interaction.update({ embeds: [embed], components: [row] });
+      } else if (interaction.customId === 'create_ticket') {
+        await interaction.deferReply({ flags: 64 });
+
+        try {
+          const settings = await getTicketSettings(interaction.guild.id);
+          if (!settings) {
+            return await interaction.editReply({ content: 'Ticket settings not configured.' });
+          }
+
+          // Find or create Tickets category
+          let category = interaction.guild.channels.cache.find(c => c.name === 'Tickets' && c.type === ChannelType.GuildCategory);
+          if (!category) {
+            category = await interaction.guild.channels.create({
+              name: 'Tickets',
+              type: ChannelType.GuildCategory,
+            });
+          }
+
+          // Generate random 6 digit number
+          const ticketNumber = Math.floor(100000 + Math.random() * 900000);
+          const channelName = `ticket-${ticketNumber}`;
+
+          // Get access roles
+          const accessRoles = settings.access_role_ids ? settings.access_role_ids.split(',') : [];
+
+          // Create permission overwrites
+          const permissionOverwrites = [
+            {
+              id: interaction.guild.roles.everyone.id,
+              deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+              type: OverwriteType.Role,
+            },
+            {
+              id: interaction.user.id,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+              type: OverwriteType.Member,
+            },
+          ];
+
+          // Add access for staff roles
+          for (const roleId of accessRoles) {
+            permissionOverwrites.push({
+              id: roleId,
+              allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
+              type: OverwriteType.Role,
+            });
+          }
+
+          // Create the channel
+          const ticketChannel = await interaction.guild.channels.create({
+            name: channelName,
+            type: ChannelType.GuildText,
+            parent: category.id,
+            permissionOverwrites,
+          });
+
+          // Save to database
+          await createTicket({
+            guild_id: interaction.guild.id,
+            channel_id: ticketChannel.id,
+            user_id: interaction.user.id,
+            created_at: Date.now(),
+          });
+
+          // Send initial message and ping
+          let pingMessage = '';
+          if (settings.ping_role_id) {
+            pingMessage = `<@&${settings.ping_role_id}> `;
+          }
+
+          await ticketChannel.send(`${pingMessage}${interaction.user} has opened a ticket!`);
+
+          await interaction.editReply({ content: `Ticket created: ${ticketChannel}` });
+        } catch (error) {
+          console.error(error);
+          await interaction.editReply({ content: 'Failed to create ticket.' });
+        }
       } else {
         // Handle button interactions (for help command pagination)
         // The help command handles its own button interactions
