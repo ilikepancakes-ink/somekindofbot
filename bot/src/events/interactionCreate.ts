@@ -81,7 +81,7 @@ module.exports = {
           }
 
           // Find or create Tickets category
-          let category = interaction.guild.channels.cache.find(c => c.name === 'Tickets' && c.type === ChannelType.GuildCategory);
+          let category = interaction.guild.channels.cache.find((c: any) => c.name === 'Tickets' && c.type === ChannelType.GuildCategory);
           if (!category) {
             category = await interaction.guild.channels.create({
               name: 'Tickets',

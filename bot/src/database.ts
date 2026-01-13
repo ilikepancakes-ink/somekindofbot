@@ -185,7 +185,7 @@ function createTicket(ticket: Ticket): Promise<number> {
     db.run(
       'INSERT INTO tickets (guild_id, channel_id, user_id, created_at) VALUES (?, ?, ?, ?)',
       [ticket.guild_id, ticket.channel_id, ticket.user_id, ticket.created_at],
-      function(err: any) {
+      function(this: any, err: any) {
         if (err) reject(err);
         else resolve(this.lastID);
       }
