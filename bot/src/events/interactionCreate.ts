@@ -141,7 +141,7 @@ module.exports = {
             pingMessage = `<@&${settings.ping_role_id}> `;
           }
 
-          await ticketChannel.send(`${pingMessage}${interaction.user} has opened a ticket!`);
+          await ticketChannel.send(`${pingMessage}${interaction.user} has opened a ticket! Remember to use \`/ticket close\` to close the ticket.`);
 
           await interaction.editReply({ content: `Ticket created: ${ticketChannel}` });
         } catch (error) {
