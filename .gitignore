@@ -7,3 +7,4 @@ bot/node_modules/.package-lock.json
 .vscode/
 .idea/
 *.db
+bot/package-lock.json

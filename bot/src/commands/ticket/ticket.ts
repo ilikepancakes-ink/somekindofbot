@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChannelType, OverwriteType } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChannelType, OverwriteType, InteractionContextType } from 'discord.js';
 import * as path from 'path';
 const { getTicketSettings, setTicketSettings, createTicket, getTicketByChannel, deleteTicket } = require(path.join(__dirname, '../../database'));
 
