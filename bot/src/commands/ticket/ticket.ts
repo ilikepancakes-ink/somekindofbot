@@ -132,7 +132,7 @@ module.exports = {
         const settings = await getTicketSettings(interaction.guild.id);
         const accessRoles = settings?.access_role_ids ? settings.access_role_ids.split(',') : [];
 
-        const permissionOverwrites = [
+        const permissionOverwrites: any[] = [
           {
             id: interaction.guild.roles.everyone.id,
             deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages],
