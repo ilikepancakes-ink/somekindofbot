@@ -13,7 +13,7 @@ class FeatureAnimator {
         moderation: {
             title: 'Moderation Commands',
             description: 'Keep your server safe with powerful moderation tools.',
-            commands: ['/kick', '/ban', '/timeout', '/log', '/update']
+            commands: ['/kick', '/ban', '/timeout', '/log', '/update', '/snipe']
         },
         fun: {
             title: 'Fun Commands',

@@ -21,34 +21,34 @@ module.exports = {
           // Delete ticket message
           await deleteTicketMessage(deletedMessage.id);
         } else {
+          // Cache for snipe command
+          deletedMessages.set(deletedMessage.channel.id, {
+            content: deletedMessage.content,
+            author: deletedMessage.author,
+            timestamp: deletedMessage.createdTimestamp
+          });
+
           // Regular message logging
           const stats = await getGuildStats(deletedMessage.guild.id);
-          if (!stats || !stats.log_webhook_url) return;
+          if (stats && stats.log_webhook_url) {
+            const logEmbed = new EmbedBuilder()
+              .setTitle('🗑️ Message Deleted')
+              .setDescription(`A message was deleted in ${deletedMessage.channel}`)
+              .addFields(
+                { name: 'Author', value: `${deletedMessage.author}`, inline: true },
+                { name: 'Channel', value: `${deletedMessage.channel}`, inline: true },
+                { name: 'Message ID', value: deletedMessage.id, inline: true },
+                { name: 'Content', value: deletedMessage.content.length > 1024 ? deletedMessage.content.substring(0, 1021) + '...' : deletedMessage.content || 'No content', inline: false }
+              )
+              .setColor(0xFF0000)
+              .setTimestamp()
+              .setFooter({ text: `User ID: ${deletedMessage.author.id}` });
 
-          const logEmbed = new EmbedBuilder()
-            .setTitle('🗑️ Message Deleted')
-            .setDescription(`A message was deleted in ${deletedMessage.channel}`)
-            .addFields(
-              { name: 'Author', value: `${deletedMessage.author}`, inline: true },
-              { name: 'Channel', value: `${deletedMessage.channel}`, inline: true },
-              { name: 'Message ID', value: deletedMessage.id, inline: true },
-              { name: 'Content', value: deletedMessage.content.length > 1024 ? deletedMessage.content.substring(0, 1021) + '...' : deletedMessage.content || 'No content', inline: false }
-            )
-            .setColor(0xFF0000)
-            .setTimestamp()
-            .setFooter({ text: `User ID: ${deletedMessage.author.id}` });
-
-          await axios.post(stats.log_webhook_url, {
-            embeds: [logEmbed.toJSON()]
-          });
+            await axios.post(stats.log_webhook_url, {
+              embeds: [logEmbed.toJSON()]
+            });
+          }
         }
-
-        // Cache for snipe command
-        deletedMessages.set(deletedMessage.channel.id, {
-          content: deletedMessage.content,
-          author: deletedMessage.author,
-          timestamp: deletedMessage.createdTimestamp
-        });
       } catch (error) {
         console.error('Error handling message deletion:', error);
       }
