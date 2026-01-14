@@ -1,7 +1,7 @@
 {
-  "name": "multi-purpose-discord-bot",
+  "name": "somekindofbot",
   "version": "1.0.0",
-  "description": "A multi-purpose Discord bot with moderation, fun, and info commands",
+  "description": "idk lol",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
