@@ -1,0 +1,16 @@
+{
+  "name": "bot-website",
+  "version": "1.0.0",
+  "description": "Website showcasing the bot features",
+  "scripts": {
+    "build": "tsc",
+    "serve": "npx http-server ."
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
