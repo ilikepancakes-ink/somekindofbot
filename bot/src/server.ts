@@ -593,8 +593,17 @@ app.get('/api/tickets/:ticketId/messages', auth, async (req, res) => {
   }
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Auth server listening on port ${port}`);
+});
+
+server.on('error', (error: any) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`Port ${port} is already in use. Management portal will not be available.`);
+  } else {
+    console.error('Server error:', error);
+  }
+  // Don't exit process, let the bot continue
 });
 
 export default app;
