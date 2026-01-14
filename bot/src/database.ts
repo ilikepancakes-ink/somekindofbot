@@ -61,6 +61,19 @@ db.run(`CREATE TABLE IF NOT EXISTS tickets (
   created_at INTEGER
 )`);
 
+// Ticket messages
+db.run(`CREATE TABLE IF NOT EXISTS ticket_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ticket_id INTEGER,
+  message_id TEXT,
+  author_id TEXT,
+  author_username TEXT,
+  content TEXT,
+  created_at INTEGER,
+  edited_at INTEGER,
+  FOREIGN KEY (ticket_id) REFERENCES tickets (id)
+)`);
+
 interface GuildStats {
   guild_id: string;
   member_channel_id?: string;
@@ -85,6 +98,17 @@ interface Ticket {
   channel_id: string;
   user_id: string;
   created_at: number;
+}
+
+interface TicketMessage {
+  id?: number;
+  ticket_id: number;
+  message_id: string;
+  author_id: string;
+  author_username: string;
+  content: string;
+  created_at: number;
+  edited_at?: number;
 }
 
 function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
@@ -211,6 +235,59 @@ function deleteTicket(channelId: string): Promise<void> {
   });
 }
 
+function getTicketsByGuild(guildId: string): Promise<Ticket[]> {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM tickets WHERE guild_id = ? ORDER BY created_at DESC', [guildId], (err: any, rows: any) => {
+      if (err) reject(err);
+      else resolve(rows as Ticket[]);
+    });
+  });
+}
+
+function createTicketMessage(message: TicketMessage): Promise<number> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO ticket_messages (ticket_id, message_id, author_id, author_username, content, created_at, edited_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [message.ticket_id, message.message_id, message.author_id, message.author_username, message.content, message.created_at, message.edited_at],
+      function(this: any, err: any) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      }
+    );
+  });
+}
+
+function getTicketMessages(ticketId: number): Promise<TicketMessage[]> {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC', [ticketId], (err: any, rows: any) => {
+      if (err) reject(err);
+      else resolve(rows as TicketMessage[]);
+    });
+  });
+}
+
+function updateTicketMessage(messageId: string, content: string, editedAt: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'UPDATE ticket_messages SET content = ?, edited_at = ? WHERE message_id = ?',
+      [content, editedAt, messageId],
+      (err: any) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+function deleteTicketMessage(messageId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM ticket_messages WHERE message_id = ?', [messageId], (err: any) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
 export {
   getGuildStats,
   setGuildStats,
@@ -223,4 +300,9 @@ export {
   createTicket,
   getTicketByChannel,
   deleteTicket,
+  getTicketsByGuild,
+  createTicketMessage,
+  getTicketMessages,
+  updateTicketMessage,
+  deleteTicketMessage,
 };

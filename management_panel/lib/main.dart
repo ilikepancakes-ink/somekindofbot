@@ -307,7 +307,10 @@ class _ManagementScreenState extends State<ManagementScreen> {
   List<Map<String, dynamic>> members = [];
   List<Map<String, dynamic>> envVars = [];
   List<Map<String, dynamic>> servers = [];
+  List<Map<String, dynamic>> tickets = [];
+  List<Map<String, dynamic>> ticketMessages = [];
   String? selectedServerId;
+  String? selectedTicketId;
   Timer? _refreshTimer;
   bool _isLoading = true;
   bool _isRefreshing = false;
@@ -544,7 +547,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
         ),
         Expanded(
           child: DefaultTabController(
-            length: 8,
+            length: 9,
             child: Scaffold(
               appBar: AppBar(
                 title: Text(
@@ -623,6 +626,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
                         ),
                       ),
                     ),
+                    Tab(text: 'Tickets'),
                     Tab(text: 'Status'),
                   ],
                 ),
@@ -636,6 +640,7 @@ class _ManagementScreenState extends State<ManagementScreen> {
                   _buildList('Members', members),
                   _buildEnvList(),
                   _buildActions(context),
+                  _buildTickets(context),
                   _buildStatus(context),
                 ],
               ),
@@ -956,6 +961,147 @@ class _ManagementScreenState extends State<ManagementScreen> {
         );
       },
     );
+  }
+
+  Widget _buildTickets(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final isSmallScreen = screenSize.width < 600;
+
+    if (selectedTicketId == null) {
+      return FutureBuilder<List<Map<String, dynamic>>>(
+        future: _loadTickets(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (snapshot.hasData) {
+            final tickets = snapshot.data!;
+            return ListView.builder(
+              itemCount: tickets.length,
+              itemBuilder: (context, index) {
+                final ticket = tickets[index];
+                final createdAt = DateTime.fromMillisecondsSinceEpoch(ticket['created_at']);
+                return ListTile(
+                  title: Text('Ticket #${ticket['id']}'),
+                  subtitle: Text('Created: ${createdAt.toString()}'),
+                  onTap: () {
+                    setState(() {
+                      selectedTicketId = ticket['id'].toString();
+                    });
+                    _loadTicketMessages(ticket['id']);
+                  },
+                );
+              },
+            );
+          } else {
+            return const Center(child: Text('No tickets found'));
+          }
+        },
+      );
+    } else {
+      return Column(
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  setState(() {
+                    selectedTicketId = null;
+                    ticketMessages = [];
+                  });
+                },
+              ),
+              Text('Ticket #$selectedTicketId', style: TextStyle(fontSize: isSmallScreen ? 16 : 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: ticketMessages.length,
+              itemBuilder: (context, index) {
+                final message = ticketMessages[index];
+                final createdAt = DateTime.fromMillisecondsSinceEpoch(message['created_at']);
+                return Card(
+                  margin: EdgeInsets.symmetric(
+                    horizontal: isSmallScreen ? 8 : 16,
+                    vertical: 4,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              message['author_username'],
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: isSmallScreen ? 14 : 16,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              createdAt.toString(),
+                              style: TextStyle(
+                                fontSize: isSmallScreen ? 12 : 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          message['content'],
+                          style: TextStyle(fontSize: isSmallScreen ? 14 : 16),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadTickets() async {
+    const baseUrl = 'https://discordbot.0x409.nl';
+    final headers = {'Authorization': 'Bearer ${widget.token}'};
+    final guildParam = selectedServerId != null ? '?guildId=$selectedServerId' : '';
+
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/api/tickets$guildParam'), headers: headers);
+      final tickets = List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      setState(() {
+        this.tickets = tickets;
+      });
+      return tickets;
+    } catch (e) {
+      print('❌ API Error in _loadTickets: $e');
+      return [];
+    }
+  }
+
+  Future<void> _loadTicketMessages(int ticketId) async {
+    const baseUrl = 'https://discordbot.0x409.nl';
+    final headers = {'Authorization': 'Bearer ${widget.token}'};
+
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/api/tickets/$ticketId/messages'), headers: headers);
+      final messages = List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      setState(() {
+        ticketMessages = messages;
+      });
+    } catch (e) {
+      print('❌ API Error in _loadTicketMessages: $e');
+      setState(() {
+        ticketMessages = [];
+      });
+    }
   }
 
   Widget _buildActions(BuildContext context) {

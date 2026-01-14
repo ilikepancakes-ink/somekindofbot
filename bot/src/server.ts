@@ -3,7 +3,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { getSession, setSession, deleteExpiredSessions } from './database';
+import { getSession, setSession, deleteExpiredSessions, getTicketsByGuild, getTicketMessages } from './database';
 
 const app = express();
 app.use(express.json());
@@ -559,6 +559,37 @@ app.get('/api/members', auth, async (req, res) => {
     };
     const result = (mockMembers as any)[guildId] || [];
     res.json(result);
+  }
+});
+
+app.get('/api/tickets', auth, async (req, res) => {
+  const guildId = req.query.guildId as string;
+  console.log(`🎫 API Request: GET /api/tickets`);
+  console.log(`   User: ${(req as any).userId}`);
+  console.log(`   Guild: ${guildId || 'none'}`);
+
+  try {
+    const tickets = await getTicketsByGuild(guildId);
+    console.log(`✅ API Success: Returned ${tickets.length} ticket records`);
+    res.json(tickets);
+  } catch (e) {
+    console.error(`❌ API Error in GET /api/tickets: ${e}`);
+    res.status(500).json({ error: 'Failed to fetch tickets' });
+  }
+});
+
+app.get('/api/tickets/:ticketId/messages', auth, async (req, res) => {
+  const { ticketId } = req.params;
+  console.log(`💬 API Request: GET /api/tickets/${ticketId}/messages`);
+  console.log(`   User: ${(req as any).userId}`);
+
+  try {
+    const messages = await getTicketMessages(parseInt(ticketId));
+    console.log(`✅ API Success: Returned ${messages.length} message records for ticket ${ticketId}`);
+    res.json(messages);
+  } catch (e) {
+    console.error(`❌ API Error in GET /api/tickets/${ticketId}/messages: ${e}`);
+    res.status(500).json({ error: 'Failed to fetch ticket messages' });
   }
 });
 
