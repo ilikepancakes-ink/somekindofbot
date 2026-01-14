@@ -7,7 +7,7 @@ import { getSession, setSession, deleteExpiredSessions, getTicketsByGuild, getTi
 
 const app = express();
 app.use(express.json());
-const port = 2976;
+const port = 2977;
 
 const clientId = process.env.DISCORD_CLIENT_ID!;
 const clientSecret = process.env.DISCORD_CLIENT_SECRET!;
