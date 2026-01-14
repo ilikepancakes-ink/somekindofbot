@@ -3,8 +3,11 @@ import axios from 'axios';
 import * as path from 'path';
 const { getGuildStats, getTicketByChannel, deleteTicketMessage } = require(path.join(__dirname, '../database'));
 
+const deletedMessages = new Map<string, any>();
+
 module.exports = {
   name: Events.MessageDelete,
+  deletedMessages,
   once: false,
   execute(deletedMessage: any) {
     (async () => {
@@ -39,6 +42,13 @@ module.exports = {
             embeds: [logEmbed.toJSON()]
           });
         }
+
+        // Cache for snipe command
+        deletedMessages.set(deletedMessage.channel.id, {
+          content: deletedMessage.content,
+          author: deletedMessage.author,
+          timestamp: deletedMessage.createdTimestamp
+        });
       } catch (error) {
         console.error('Error handling message deletion:', error);
       }
