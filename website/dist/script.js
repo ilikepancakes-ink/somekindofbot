@@ -7,12 +7,12 @@ class FeatureAnimator {
             moderation: {
                 title: 'Moderation Commands',
                 description: 'Keep your server safe with powerful moderation tools.',
-                commands: ['/kick', '/ban', '/timeout', '/log', '/update', '/snipe', '/lockdown']
+                commands: ['/kick', '/ban', '/timeout', '/log', '/lockdown']
             },
             fun: {
                 title: 'Fun Commands',
                 description: 'Add entertainment to your server with fun interactions.',
-                commands: ['/joke', '/meme', '/roblox']
+                commands: ['/joke', '/meme', '/roblox', '/snipe']
             },
             info: {
                 title: 'Info Commands',
@@ -21,17 +21,17 @@ class FeatureAnimator {
             },
             tickets: {
                 title: 'Ticket System',
-                description: 'Handle support requests efficiently with the ticket system.',
+                description: 'Handle support requests with the ticket system.',
                 commands: ['/ticket']
             },
             welcome: {
                 title: 'Welcome Messages',
-                description: 'Automatically greet new members and say goodbye.',
+                description: 'Greet new members and say goodbye.',
                 commands: ['/welcome', '/goodbye']
             },
             dashboard: {
                 title: 'Management Dashboard',
-                description: 'Manage your bot through a user-friendly web interface and generate tokens.',
+                description: 'Manage your self-deployed bot through a user-friendly app on all platforms other than OpenBSD. (webmaster note: why couldent we just make a admin panel twin wtf)',
                 commands: ['/generate-token']
             }
         };
