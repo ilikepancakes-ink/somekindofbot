@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, InteractionContextType } from 'discord.js';
 import * as path from 'path';
-const { getXPSettings, setXPSettings, getTopXPUsers, setXPLevel, getAllXPLevels } = require(path.join(__dirname, '../../xpDatabase'));
+const { getXPSettings, setXPSettings, getTopXPUsers, setXPLevel, getAllXPLevels, getXPUser } = require(path.join(__dirname, '../../xpDatabase'));
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -35,7 +35,14 @@ module.exports = {
       subcommand
         .setName('leaderboard')
         .setDescription('Show the XP leaderboard'))
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('progress')
+        .setDescription('Show XP progress for a user')
+        .addUserOption(option =>
+          option.setName('user')
+            .setDescription('The user to check progress for (defaults to yourself)')
+            .setRequired(false)))
     .setContexts([InteractionContextType.Guild]),
 
   async execute(interaction: any) {
@@ -94,6 +101,30 @@ module.exports = {
         }
 
         embed.setDescription(description);
+
+        await interaction.reply({ embeds: [embed] });
+      } else if (subcommand === 'progress') {
+        const targetUser = interaction.options.getUser('user') || interaction.user;
+        const userXP = await getXPUser(interaction.guild.id, targetUser.id);
+
+        const currentXP = userXP ? userXP.xp : 0;
+        const currentLevel = Math.floor(currentXP / 100);
+        const xpInLevel = currentXP % 100;
+        const xpNeeded = 100;
+        const nextLevel = currentLevel + 1;
+
+        // Create progress bar (20 characters wide)
+        const progressPercent = xpInLevel / 100;
+        const filledBlocks = Math.floor(progressPercent * 20);
+        const emptyBlocks = 20 - filledBlocks;
+        const progressBar = '█'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
+
+        const embed = new EmbedBuilder()
+          .setTitle(`${targetUser.username}'s XP Progress`)
+          .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 128 }))
+          .setColor(0x00FF00)
+          .setDescription(`**${progressBar}**\n\nXP: ${xpInLevel}/${xpNeeded} - Level ${currentLevel} Next Level ${nextLevel}`)
+          .setTimestamp();
 
         await interaction.reply({ embeds: [embed] });
       }

@@ -39,6 +39,18 @@ module.exports = {
                   console.error('Error assigning level role:', error);
                 }
               }
+
+              // Send DM to user
+              try {
+                const nextLevel = newLevel + 1;
+                const requiredXP = nextLevel * 100;
+                const dmMessage = `Congrats, ${message.author.username}! you are now at ${newXP}xp and at level${newLevel}! next level is ${nextLevel} and that needs ${requiredXP}! remember you get 10 xp for every message and 1 xp for every reaction!`;
+
+                await message.author.send(dmMessage);
+              } catch (error) {
+                console.error('Error sending level up DM:', error);
+                // User might have DMs disabled, which is fine
+              }
             }
           }
         }
