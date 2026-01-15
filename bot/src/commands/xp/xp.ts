@@ -109,12 +109,11 @@ module.exports = {
 
         const currentXP = userXP ? userXP.xp : 0;
         const currentLevel = Math.floor(currentXP / 100);
-        const xpInLevel = currentXP % 100;
-        const xpNeeded = 100;
         const nextLevel = currentLevel + 1;
+        const xpNeededForNext = nextLevel * 100;
 
         // Create progress bar (20 characters wide)
-        const progressPercent = xpInLevel / 100;
+        const progressPercent = currentXP / xpNeededForNext;
         const filledBlocks = Math.floor(progressPercent * 20);
         const emptyBlocks = 20 - filledBlocks;
         const progressBar = '█'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
@@ -123,7 +122,7 @@ module.exports = {
           .setTitle(`${targetUser.username}'s XP Progress`)
           .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 128 }))
           .setColor(0x00FF00)
-          .setDescription(`**${progressBar}**\n\nXP: ${xpInLevel}/${xpNeeded} - Level ${currentLevel} Next Level ${nextLevel}`)
+          .setDescription(`**${progressBar}**\n\nXP: ${currentXP}/${xpNeededForNext} - Level ${currentLevel} Next Level ${nextLevel}`)
           .setTimestamp();
 
         await interaction.reply({ embeds: [embed] });
