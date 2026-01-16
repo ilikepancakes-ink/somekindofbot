@@ -151,12 +151,59 @@ function deleteXPLevel(guildId: string, level: number): Promise<void> {
   });
 }
 
+function removeXP(guildId: string, userId: string, xpToRemove: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    xpDb.run(
+      'UPDATE xp_users SET xp = MAX(0, xp - ?) WHERE guild_id = ? AND user_id = ?',
+      [xpToRemove, guildId, userId],
+      (err: any) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+function clearUserXP(guildId: string, userId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    xpDb.run('DELETE FROM xp_users WHERE guild_id = ? AND user_id = ?', [guildId, userId], (err: any) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+function nukeGuildXP(guildId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Delete all XP data for the guild
+    const queries = [
+      'DELETE FROM xp_users WHERE guild_id = ?',
+      'DELETE FROM xp_levels WHERE guild_id = ?',
+      'DELETE FROM xp_settings WHERE guild_id = ?'
+    ];
+
+    let completed = 0;
+    const total = queries.length;
+
+    queries.forEach(query => {
+      xpDb.run(query, [guildId], (err: any) => {
+        if (err) reject(err);
+        completed++;
+        if (completed === total) resolve();
+      });
+    });
+  });
+}
+
 export {
   getXPSettings,
   setXPSettings,
   getXPUser,
   setXPUser,
   addXP,
+  removeXP,
+  clearUserXP,
+  nukeGuildXP,
   getTopXPUsers,
   getXPLevel,
   setXPLevel,

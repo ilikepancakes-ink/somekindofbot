@@ -1,6 +1,6 @@
-import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, InteractionContextType } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, InteractionContextType, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import * as path from 'path';
-const { getXPSettings, setXPSettings, getTopXPUsers, setXPLevel, getAllXPLevels, getXPUser } = require(path.join(__dirname, '../../xpDatabase'));
+const { getXPSettings, setXPSettings, getTopXPUsers, setXPLevel, getAllXPLevels, getXPUser, addXP, removeXP, clearUserXP, nukeGuildXP } = require(path.join(__dirname, '../../xpDatabase'));
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -31,6 +31,43 @@ module.exports = {
               option.setName('role')
                 .setDescription('The role to give at this level')
                 .setRequired(true))))
+    .addSubcommandGroup(group =>
+      group
+        .setName('edit')
+        .setDescription('Edit user XP values')
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('modify')
+            .setDescription('Add or remove XP from a user')
+            .addUserOption(option =>
+              option.setName('user')
+                .setDescription('The user to modify XP for')
+                .setRequired(true))
+            .addStringOption(option =>
+              option.setName('operation')
+                .setDescription('Add or remove XP')
+                .setRequired(true)
+                .addChoices(
+                  { name: 'Add', value: 'add' },
+                  { name: 'Remove', value: 'remove' }
+                ))
+            .addIntegerOption(option =>
+              option.setName('amount')
+                .setDescription('Amount of XP to add/remove')
+                .setRequired(true)
+                .setMinValue(1)))
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('clear')
+            .setDescription('Clear all XP from a user')
+            .addUserOption(option =>
+              option.setName('user')
+                .setDescription('The user to clear XP for')
+                .setRequired(true)))
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('nuke')
+            .setDescription('NUKE ALL XP DATA FOR THIS GUILD (ADMIN ONLY)')))
     .addSubcommand(subcommand =>
       subcommand
         .setName('leaderboard')
@@ -126,6 +163,48 @@ module.exports = {
           .setTimestamp();
 
         await interaction.reply({ embeds: [embed] });
+      } else if (subcommandGroup === 'edit' && subcommand === 'modify') {
+        const targetUser = interaction.options.getUser('user');
+        const operation = interaction.options.getString('operation');
+        const amount = interaction.options.getInteger('amount');
+
+        if (operation === 'add') {
+          await addXP(interaction.guild.id, targetUser.id, amount);
+          await interaction.reply(`Added ${amount} XP to ${targetUser.username}!`);
+        } else if (operation === 'remove') {
+          await removeXP(interaction.guild.id, targetUser.id, amount);
+          await interaction.reply(`Removed ${amount} XP from ${targetUser.username}!`);
+        }
+      } else if (subcommandGroup === 'edit' && subcommand === 'clear') {
+        const targetUser = interaction.options.getUser('user');
+
+        await clearUserXP(interaction.guild.id, targetUser.id);
+        await interaction.reply(`Cleared all XP from ${targetUser.username}!`);
+      } else if (subcommandGroup === 'edit' && subcommand === 'nuke') {
+        // Check if user has admin permissions
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return await interaction.reply({ content: 'You need Administrator permissions to use this command!', flags: 64 });
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle('⚠️ DANGER ZONE ⚠️')
+          .setDescription('**WARNING:** This will permanently delete ALL XP data for this server, including:\n• All user XP\n• All level roles\n• All XP settings\n\nThis action cannot be undone!')
+          .setColor(0xFF0000)
+          .setFooter({ text: 'Click the button below to proceed with confirmation' });
+
+        const button = new ButtonBuilder()
+          .setCustomId('xp_nuke_confirm')
+          .setLabel('I Understand - Proceed')
+          .setStyle(ButtonStyle.Danger);
+
+        const row = new ActionRowBuilder<ButtonBuilder>()
+          .addComponents(button);
+
+        await interaction.reply({
+          embeds: [embed],
+          components: [row],
+          flags: 64 // Ephemeral
+        });
       }
     } catch (error) {
       console.error('XP command error:', error);

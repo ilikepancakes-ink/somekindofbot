@@ -1,7 +1,8 @@
-import { Events, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, PermissionFlagsBits, OverwriteType, ChannelType } from 'discord.js';
+import { Events, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, PermissionFlagsBits, OverwriteType, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { rule34Data } from '../commands/nsfw/rule34';
 import * as path from 'path';
 const { getTicketSettings, createTicket } = require(path.join(__dirname, '../database'));
+const { nukeGuildXP } = require(path.join(__dirname, '../xpDatabase'));
 
 module.exports = {
   name: Events.InteractionCreate,
@@ -148,9 +149,62 @@ module.exports = {
           console.error(error);
           await interaction.editReply({ content: 'Failed to create ticket.' });
         }
+      } else if (interaction.customId === 'xp_nuke_confirm') {
+        // Check admin permissions again
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return await interaction.reply({ content: 'You need Administrator permissions to use this command!', flags: 64 });
+        }
+
+        const modal = new ModalBuilder()
+          .setCustomId('xp_nuke_modal')
+          .setTitle('FINAL CONFIRMATION REQUIRED');
+
+        const confirmInput = new TextInputBuilder()
+          .setCustomId('confirm_text')
+          .setLabel('Type "CONFIRM" to permanently delete all XP data')
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder('Type CONFIRM here')
+          .setRequired(true)
+          .setMinLength(7)
+          .setMaxLength(7);
+
+        const firstActionRow = new ActionRowBuilder<TextInputBuilder>()
+          .addComponents(confirmInput);
+
+        modal.addComponents(firstActionRow);
+
+        await interaction.showModal(modal);
       } else {
         // Handle button interactions (for help command pagination)
         // The help command handles its own button interactions
+      }
+    } else if (interaction.isModalSubmit()) {
+      if (interaction.customId === 'xp_nuke_modal') {
+        const confirmText = interaction.fields.getTextInputValue('confirm_text');
+
+        if (confirmText.toUpperCase() !== 'CONFIRM') {
+          return await interaction.reply({ content: 'Confirmation failed. XP data was NOT deleted.', flags: 64 });
+        }
+
+        // Check admin permissions one final time
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+          return await interaction.reply({ content: 'You need Administrator permissions to use this command!', flags: 64 });
+        }
+
+        try {
+          await nukeGuildXP(interaction.guild.id);
+
+          const embed = new EmbedBuilder()
+            .setTitle('💥 NUKE COMPLETE 💥')
+            .setDescription('All XP data for this server has been permanently deleted:\n• All user XP\n• All level roles\n• All XP settings')
+            .setColor(0x00FF00)
+            .setTimestamp();
+
+          await interaction.reply({ embeds: [embed], flags: 64 });
+        } catch (error) {
+          console.error('Error nuking XP data:', error);
+          await interaction.reply({ content: 'Failed to delete XP data. Please try again.', flags: 64 });
+        }
       }
     }
   },
