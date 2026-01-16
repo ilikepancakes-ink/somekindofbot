@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const app = express();
 const port = 8594;
 
-const { getFMUser, setFMUser } = require('../bot/src/database');
+const { getFMUser, setFMUser } = require('../bot/dist/database');
 
 // Last.fm OAuth setup
 const oauth = OAuth({
