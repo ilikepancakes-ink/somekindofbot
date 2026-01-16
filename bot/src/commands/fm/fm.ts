@@ -88,16 +88,16 @@ async function handleFm(interaction: any) {
   const mode = interaction.options.getString('mode') || 'embedmini';
 
   const fmUser = await getFMUser(targetUser.id);
-  if (!fmUser || !fmUser.lastfm_username) {
-    return interaction.reply({ content: `${targetUser.username} has not connected their Last.fm account. Use /fm login to connect.`, ephemeral: true });
-  }
+    if (!fmUser || !fmUser.lastfm_username) {
+      return interaction.reply({ content: `${targetUser.username} has not connected their Last.fm account. Use /fm login to connect.`, flags: 64 });
+    }
 
   try {
     const response = await axios.get(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${fmUser.lastfm_username}&api_key=${process.env.LASTFM_API_KEY}&format=json&limit=2`);
     const data = response.data;
 
     if (!data.recenttracks || !data.recenttracks.track || data.recenttracks.track.length === 0) {
-      return interaction.reply({ content: 'No recent tracks found.', ephemeral: true });
+      return interaction.reply({ content: 'No recent tracks found.', flags: 64 });
     }
 
     const embed = new EmbedBuilder()
@@ -120,7 +120,7 @@ async function handleFm(interaction: any) {
     await interaction.reply({ embeds: [embed] });
   } catch (error) {
     console.error(error);
-    await interaction.reply({ content: 'Failed to fetch scrobbles.', ephemeral: true });
+    await interaction.reply({ content: 'Failed to fetch scrobbles.', flags: 64 });
   }
 }
 
@@ -131,7 +131,7 @@ async function handleRecent(interaction: any) {
 
   const fmUser = await getFMUser(targetUser.id);
   if (!fmUser || !fmUser.lastfm_username) {
-    return interaction.reply({ content: `${targetUser.username} has not connected their Last.fm account. Use /fm login to connect.`, ephemeral: true });
+    return interaction.reply({ content: `${targetUser.username} has not connected their Last.fm account. Use /fm login to connect.`, flags: 64 });
   }
 
   try {
@@ -144,7 +144,7 @@ async function handleRecent(interaction: any) {
     const data = response.data;
 
     if (!data.recenttracks || !data.recenttracks.track || data.recenttracks.track.length === 0) {
-      return interaction.reply({ content: 'No recent tracks found.', ephemeral: true });
+      return interaction.reply({ content: 'No recent tracks found.', flags: 64 });
     }
 
     const embed = new EmbedBuilder()
@@ -168,7 +168,7 @@ async function handleRecent(interaction: any) {
     await interaction.reply({ embeds: [embed] });
   } catch (error) {
     console.error(error);
-    await interaction.reply({ content: 'Failed to fetch recent plays.', ephemeral: true });
+    await interaction.reply({ content: 'Failed to fetch recent plays.', flags: 64 });
   }
 }
 
@@ -177,7 +177,7 @@ async function handleTrack(interaction: any) {
 
   const fmUser = await getFMUser(interaction.user.id);
   if (!fmUser || !fmUser.lastfm_username) {
-    return interaction.reply({ content: 'You need to connect your Last.fm account first. Use /fm login.', ephemeral: true });
+    return interaction.reply({ content: 'You need to connect your Last.fm account first. Use /fm login.', flags: 64 });
   }
 
   try {
@@ -187,7 +187,7 @@ async function handleTrack(interaction: any) {
       const searchResponse = await axios.get(`https://ws.audioscrobbler.com/2.0/?method=track.search&track=${encodeURIComponent(trackQuery)}&api_key=${process.env.LASTFM_API_KEY}&format=json&limit=1`);
       const track = searchResponse.data.results.trackmatches.track[0];
       if (!track) {
-        return interaction.reply({ content: 'Track not found.', ephemeral: true });
+        return interaction.reply({ content: 'Track not found.', flags: 64 });
       }
 
       const infoResponse = await axios.get(`https://ws.audioscrobbler.com/2.0/?method=track.getInfo&artist=${encodeURIComponent(track.artist)}&track=${encodeURIComponent(track.name)}&api_key=${process.env.LASTFM_API_KEY}&format=json`);
@@ -196,7 +196,7 @@ async function handleTrack(interaction: any) {
       const recentResponse = await axios.get(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${fmUser.lastfm_username}&api_key=${process.env.LASTFM_API_KEY}&format=json&limit=1`);
       const track = recentResponse.data.recenttracks.track[0];
       if (!track || !track['@attr'] || track['@attr'].nowplaying !== 'true') {
-        return interaction.reply({ content: 'You are not currently playing a track.', ephemeral: true });
+        return interaction.reply({ content: 'You are not currently playing a track.', flags: 64 });
       }
 
       const infoResponse = await axios.get(`https://ws.audioscrobbler.com/2.0/?method=track.getInfo&artist=${encodeURIComponent(track.artist['#text'])}&track=${encodeURIComponent(track.name)}&api_key=${process.env.LASTFM_API_KEY}&format=json`);
@@ -221,7 +221,7 @@ async function handleTrack(interaction: any) {
     await interaction.reply({ embeds: [embed] });
   } catch (error) {
     console.error(error);
-    await interaction.reply({ content: 'Failed to fetch track info.', ephemeral: true });
+    await interaction.reply({ content: 'Failed to fetch track info.', flags: 64 });
   }
 }
 
@@ -230,7 +230,7 @@ async function handleAlbum(interaction: any) {
 
   const fmUser = await getFMUser(interaction.user.id);
   if (!fmUser || !fmUser.lastfm_username) {
-    return interaction.reply({ content: 'You need to connect your Last.fm account first. Use /fm login.', ephemeral: true });
+    return interaction.reply({ content: 'You need to connect your Last.fm account first. Use /fm login.', flags: 64 });
   }
 
   try {
@@ -240,7 +240,7 @@ async function handleAlbum(interaction: any) {
       const searchResponse = await axios.get(`https://ws.audioscrobbler.com/2.0/?method=album.search&album=${encodeURIComponent(albumQuery)}&api_key=${process.env.LASTFM_API_KEY}&format=json&limit=1`);
       const album = searchResponse.data.results.albummatches.album[0];
       if (!album) {
-        return interaction.reply({ content: 'Album not found.', ephemeral: true });
+        return interaction.reply({ content: 'Album not found.', flags: 64 });
       }
 
       const infoResponse = await axios.get(`https://ws.audioscrobbler.com/2.0/?method=album.getInfo&artist=${encodeURIComponent(album.artist)}&album=${encodeURIComponent(album.name)}&api_key=${process.env.LASTFM_API_KEY}&format=json`);
@@ -249,7 +249,7 @@ async function handleAlbum(interaction: any) {
       const recentResponse = await axios.get(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${fmUser.lastfm_username}&api_key=${process.env.LASTFM_API_KEY}&format=json&limit=1`);
       const track = recentResponse.data.recenttracks.track[0];
       if (!track) {
-        return interaction.reply({ content: 'No recent tracks found.', ephemeral: true });
+        return interaction.reply({ content: 'No recent tracks found.', flags: 64 });
       }
 
       const infoResponse = await axios.get(`https://ws.audioscrobbler.com/2.0/?method=album.getInfo&artist=${encodeURIComponent(track.artist['#text'])}&album=${encodeURIComponent(track.album['#text'])}&api_key=${process.env.LASTFM_API_KEY}&format=json`);
@@ -273,7 +273,7 @@ async function handleAlbum(interaction: any) {
     await interaction.reply({ embeds: [embed] });
   } catch (error) {
     console.error(error);
-    await interaction.reply({ content: 'Failed to fetch album info.', ephemeral: true });
+    await interaction.reply({ content: 'Failed to fetch album info.', flags: 64 });
   }
 }
 
@@ -281,7 +281,7 @@ async function handleLogin(interaction: any) {
   const fmUser = await getFMUser(interaction.user.id);
 
   if (fmUser && fmUser.lastfm_username) {
-    return interaction.reply({ content: `You are already connected as ${fmUser.lastfm_username}.`, ephemeral: true });
+    return interaction.reply({ content: `You are already connected as ${fmUser.lastfm_username}.`, flags: 64 });
   }
 
   const authUrl = `https://www.last.fm/api/auth/?api_key=${process.env.LASTFM_API_KEY}&cb=https://c18h24o2.0x409.nl/callback?user_id=${interaction.user.id}`;
@@ -299,7 +299,7 @@ async function handleLogin(interaction: any) {
   const row = new ActionRowBuilder<ButtonBuilder>()
     .addComponents(button);
 
-  await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+  await interaction.reply({ embeds: [embed], components: [row], flags: 64 });
 }
 
 async function handleFullhelp(interaction: any) {
@@ -314,5 +314,5 @@ async function handleFullhelp(interaction: any) {
       { name: '👤 Miscellaneous Commands', value: '`/fm login` - Connect your Last.fm account\n`/fm fullhelp` - Shows this help', inline: false }
     );
 
-  await interaction.reply({ embeds: [embed], ephemeral: true });
+  await interaction.reply({ embeds: [embed], flags: 64 });
 }

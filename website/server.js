@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '../bot/.env' });
 const express = require('express');
 const path = require('path');
 const axios = require('axios');
