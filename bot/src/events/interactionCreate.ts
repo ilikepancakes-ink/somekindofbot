@@ -174,6 +174,61 @@ module.exports = {
         modal.addComponents(firstActionRow);
 
         await interaction.showModal(modal);
+      } else if (interaction.customId.startsWith('user_permissions_')) {
+        const userId = interaction.customId.split('_')[2];
+
+        if (!interaction.guild) {
+          return await interaction.reply({ content: 'This command can only be used in a server.', ephemeral: true });
+        }
+
+        const member = interaction.guild.members.cache.get(userId);
+        if (!member) {
+          return await interaction.reply({ content: 'Could not find that member in this server.', ephemeral: true });
+        }
+
+        const permissions = member.permissions.toArray();
+        const sortedPerms = permissions.sort();
+
+        const embed = new EmbedBuilder()
+          .setTitle(`Permissions for ${member.displayName}`)
+          .setColor(member.displayHexColor)
+          .setDescription('✅ = Granted, ❌ = Denied');
+
+        const columns: string[][] = [[], [], []];
+        const colCharLimits = [0, 0, 0];
+        const maxColChars = 900;
+
+        for (const perm of sortedPerms) {
+          const permStr = `${member.permissions.has(perm as any) ? '✅' : '❌'} ${perm.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}\n`;
+
+          let bestCol = -1;
+          let minLen = Infinity;
+          for (let i = 0; i < 3; i++) {
+            if (colCharLimits[i] + permStr.length < maxColChars) {
+              if (colCharLimits[i] < minLen) {
+                minLen = colCharLimits[i];
+                bestCol = i;
+              }
+            }
+          }
+
+          if (bestCol !== -1) {
+            columns[bestCol].push(permStr);
+            colCharLimits[bestCol] += permStr.length;
+          } else {
+            const shortestCol = colCharLimits.indexOf(Math.min(...colCharLimits));
+            columns[shortestCol].push(permStr);
+            colCharLimits[shortestCol] += permStr.length;
+          }
+        }
+
+        for (let i = 0; i < 3; i++) {
+          if (columns[i].length > 0) {
+            embed.addFields({ name: `Permissions ${i + 1}`, value: columns[i].join(''), inline: true });
+          }
+        }
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
       } else {
         // Handle button interactions (for help command pagination)
         // The help command handles its own button interactions

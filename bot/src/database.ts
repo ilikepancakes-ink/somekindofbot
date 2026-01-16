@@ -74,6 +74,13 @@ db.run(`CREATE TABLE IF NOT EXISTS ticket_messages (
   FOREIGN KEY (ticket_id) REFERENCES tickets (id)
 )`);
 
+// FM users
+db.run(`CREATE TABLE IF NOT EXISTS fm_users (
+  discord_user_id TEXT PRIMARY KEY,
+  lastfm_username TEXT,
+  session_key TEXT
+)`);
+
 interface GuildStats {
   guild_id: string;
   member_channel_id?: string;
@@ -109,6 +116,12 @@ interface TicketMessage {
   content: string;
   created_at: number;
   edited_at?: number;
+}
+
+interface FMUser {
+  discord_user_id: string;
+  lastfm_username?: string;
+  session_key?: string;
 }
 
 function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
@@ -288,6 +301,28 @@ function deleteTicketMessage(messageId: string): Promise<void> {
   });
 }
 
+function getFMUser(discordUserId: string): Promise<FMUser | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM fm_users WHERE discord_user_id = ?', [discordUserId], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row as FMUser | undefined);
+    });
+  });
+}
+
+function setFMUser(user: FMUser): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT OR REPLACE INTO fm_users (discord_user_id, lastfm_username, session_key) VALUES (?, ?, ?)',
+      [user.discord_user_id, user.lastfm_username, user.session_key],
+      (err: any) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
 export {
   getGuildStats,
   setGuildStats,
@@ -305,4 +340,6 @@ export {
   getTicketMessages,
   updateTicketMessage,
   deleteTicketMessage,
+  getFMUser,
+  setFMUser,
 };
