@@ -15,6 +15,7 @@ module.exports = {
         // Handle XP tracking
         if (message.guild) {
           const settings = await getXPSettings(message.guild.id);
+          console.log(`XP Debug: Guild ${message.guild.name}, Settings:`, settings);
           if (settings && settings.enabled) {
             // Get current XP
             const userXP = await getXPUser(message.guild.id, message.author.id);
