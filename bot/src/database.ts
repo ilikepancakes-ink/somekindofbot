@@ -323,7 +323,7 @@ function setFMUser(user: FMUser): Promise<void> {
     );
   });
 }
-
+// EU please for the love of god dont burn my house down for collecting too much user data pweease i swear ill abide by the GDPR >.<
 export {
   getGuildStats,
   setGuildStats,
