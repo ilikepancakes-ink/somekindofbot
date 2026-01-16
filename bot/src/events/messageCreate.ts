@@ -44,7 +44,7 @@ module.exports = {
               try {
                 const nextLevel = newLevel + 1;
                 const requiredXP = nextLevel * 100;
-                const dmMessage = `Congrats, ${message.author.username}! you are now at ${newXP}xp and at level${newLevel}! next level is ${nextLevel} and that needs ${requiredXP}! remember you get 10 xp for every message and 1 xp for every reaction!`;
+                const dmMessage = `Congrats, ${message.author.username}! you are now at ${newXP}xp and at level${newLevel}! next level is ${nextLevel} and that needs ${requiredXP}! remember you get 3 xp for every message and 1 xp for every reaction!`;
 
                 await message.author.send(dmMessage);
               } catch (error) {

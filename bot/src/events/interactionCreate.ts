@@ -161,7 +161,7 @@ module.exports = {
 
         const confirmInput = new TextInputBuilder()
           .setCustomId('confirm_text')
-          .setLabel('Type "CONFIRM" to permanently delete all XP data')
+          .setLabel('Type "CONFIRM" to delete ALL XP data')
           .setStyle(TextInputStyle.Short)
           .setPlaceholder('Type CONFIRM here')
           .setRequired(true)
