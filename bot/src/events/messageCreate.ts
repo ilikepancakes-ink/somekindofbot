@@ -21,11 +21,11 @@ module.exports = {
             const currentXP = userXP ? userXP.xp : 0;
             const oldLevel = Math.floor(currentXP / 100);
 
-            // Add 10 XP
-            await addXP(message.guild.id, message.author.id, 10);
+            // Add 3 XP
+            await addXP(message.guild.id, message.author.id, 3);
 
             // Check for level up
-            const newXP = currentXP + 10;
+            const newXP = currentXP + 3;
             const newLevel = Math.floor(newXP / 100);
 
             if (newLevel > oldLevel) {
