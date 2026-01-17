@@ -67,7 +67,7 @@ app.get('/callback', async (req, res) => {
     res.send('Last.fm account connected successfully! You can close this window.');
   } catch (error) {
     console.error(error);
-    res.status(500).send('Failed to connect Last.fm account.');
+    res.status(500).send(`Failed to connect Last.fm account.\n\n${error.stack}`);
   }
 });
 
