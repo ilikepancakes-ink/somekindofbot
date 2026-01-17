@@ -284,22 +284,28 @@ async function handleLogin(interaction: any) {
     return interaction.reply({ content: `You are already connected as ${fmUser.lastfm_username}.`, flags: 64 });
   }
 
-  const authUrl = `https://www.last.fm/api/auth/?api_key=${process.env.LASTFM_API_KEY}&cb=https://c18h24o2.0x409.nl/callback?user_id=${interaction.user.id}`;
+  try {
+    const response = await axios.get(`http://localhost:8594/auth/${interaction.user.id}`);
+    const authUrl = response.data.authUrl;
 
-  const embed = new EmbedBuilder()
-    .setTitle('Connect Last.fm Account')
-    .setDescription('Click the button below to authorize your Last.fm account.')
-    .setColor(0xff0000);
+    const embed = new EmbedBuilder()
+      .setTitle('Connect Last.fm Account')
+      .setDescription('Click the button below to authorize your Last.fm account.')
+      .setColor(0xff0000);
 
-  const button = new ButtonBuilder()
-    .setLabel('Authorize')
-    .setURL(authUrl)
-    .setStyle(ButtonStyle.Link);
+    const button = new ButtonBuilder()
+      .setLabel('Authorize')
+      .setURL(authUrl)
+      .setStyle(ButtonStyle.Link);
 
-  const row = new ActionRowBuilder<ButtonBuilder>()
-    .addComponents(button);
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(button);
 
-  await interaction.reply({ embeds: [embed], components: [row], flags: 64 });
+    await interaction.reply({ embeds: [embed], components: [row], flags: 64 });
+  } catch (error) {
+    console.error(error);
+    await interaction.reply({ content: 'Failed to initiate Last.fm authentication.', flags: 64 });
+  }
 }
 
 async function handleFullhelp(interaction: any) {

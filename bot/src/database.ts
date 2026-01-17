@@ -82,6 +82,13 @@ db.run(`CREATE TABLE IF NOT EXISTS fm_users (
   session_key TEXT
 )`);
 
+// FM request tokens
+db.run(`CREATE TABLE IF NOT EXISTS fm_request_tokens (
+  discord_user_id TEXT PRIMARY KEY,
+  request_token TEXT,
+  request_token_secret TEXT
+)`);
+
 interface GuildStats {
   guild_id: string;
   member_channel_id?: string;
@@ -123,6 +130,12 @@ interface FMUser {
   discord_user_id: string;
   lastfm_username?: string;
   session_key?: string;
+}
+
+interface FMRequestToken {
+  discord_user_id: string;
+  request_token: string;
+  request_token_secret: string;
 }
 
 function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
@@ -323,6 +336,29 @@ function setFMUser(user: FMUser): Promise<void> {
     );
   });
 }
+
+function getFMRequestToken(discordUserId: string): Promise<FMRequestToken | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM fm_request_tokens WHERE discord_user_id = ?', [discordUserId], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row as FMRequestToken | undefined);
+    });
+  });
+}
+
+function setFMRequestToken(token: FMRequestToken): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT OR REPLACE INTO fm_request_tokens (discord_user_id, request_token, request_token_secret) VALUES (?, ?, ?)',
+      [token.discord_user_id, token.request_token, token.request_token_secret],
+      (err: any) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
 // EU please for the love of god dont burn my house down for collecting too much user data pweease i swear ill abide by the GDPR >.<
 export {
   getGuildStats,
@@ -343,4 +379,6 @@ export {
   deleteTicketMessage,
   getFMUser,
   setFMUser,
+  getFMRequestToken,
+  setFMRequestToken,
 };

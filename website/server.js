@@ -7,7 +7,7 @@ const crypto = require('crypto');
 const app = express();
 const port = 8594;
 
-const { getFMUser, setFMUser } = require('../bot/dist/database');
+const { getFMUser, setFMUser, getFMRequestToken, setFMRequestToken } = require('../bot/dist/database');
 
 // Last.fm OAuth setup
 const oauth = OAuth({
@@ -30,6 +30,60 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Get Last.fm request token
+app.get('/auth/:user_id', async (req, res) => {
+  const user_id = req.params.user_id;
+
+  try {
+    // Get request token
+    const request_data = {
+      url: 'https://ws.audioscrobbler.com/2.0/',
+      method: 'POST',
+      data: {
+        method: 'auth.getRequestToken',
+        api_key: process.env.LASTFM_API_KEY,
+      },
+    };
+
+    const headers = oauth.toHeader(oauth.authorize(request_data));
+
+    const params = new URLSearchParams(request_data.data);
+    const response = await axios.post(request_data.url, params.toString(), {
+      headers: {
+        ...headers,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+
+    // Parse XML response
+    const xml = response.data;
+    const tokenMatch = xml.match(/<oauth_token>(.*?)<\/oauth_token>/);
+    const secretMatch = xml.match(/<oauth_token_secret>(.*?)<\/oauth_token_secret>/);
+
+    if (!tokenMatch || !secretMatch) {
+      throw new Error('Invalid response from Last.fm');
+    }
+
+    const request_token = tokenMatch[1];
+    const request_token_secret = secretMatch[1];
+
+    // Store
+    await setFMRequestToken({
+      discord_user_id: user_id,
+      request_token,
+      request_token_secret
+    });
+
+    // Return auth URL
+    const authUrl = `https://www.last.fm/api/auth/?api_key=${process.env.LASTFM_API_KEY}&cb=https://c18h24o2.0x409.nl/callback?user_id=${user_id}`;
+
+    res.json({ authUrl });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Failed to get request token');
+  }
+});
+
 // Last.fm OAuth callback
 app.get('/callback', async (req, res) => {
   const { token, user_id } = req.query;
@@ -39,6 +93,12 @@ app.get('/callback', async (req, res) => {
   }
 
   try {
+    // Get stored request token
+    const stored = await getFMRequestToken(user_id);
+    if (!stored || stored.request_token !== token) {
+      return res.status(400).send('Invalid or expired token');
+    }
+
     // Get session key
     const request_data = {
       url: 'https://ws.audioscrobbler.com/2.0/',
@@ -50,7 +110,7 @@ app.get('/callback', async (req, res) => {
       },
     };
 
-    const headers = oauth.toHeader(oauth.authorize(request_data));
+    const headers = oauth.toHeader(oauth.authorize(request_data, { key: token, secret: stored.request_token_secret }));
 
     const params = new URLSearchParams(request_data.data);
     const response = await axios.post(request_data.url, params.toString(), {
