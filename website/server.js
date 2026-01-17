@@ -94,8 +94,12 @@ app.get('/callback', async (req, res) => {
   try {
     // Get stored request token
     const stored = await getFMRequestToken(user_id);
-    if (!stored || stored.request_token !== token) {
-      return res.status(400).send('Invalid or expired token');
+    if (!stored) {
+      return res.status(400).send('No stored request token found for this user');
+    }
+    
+    if (stored.request_token !== token) {
+      return res.status(400).send(`Token mismatch. Expected: ${stored.request_token}, Got: ${token}`);
     }
 
     // Get session key
