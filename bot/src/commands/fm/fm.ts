@@ -281,8 +281,10 @@ async function handleLogin(interaction: any) {
   const fmUser = await getFMUser(interaction.user.id);
 
   if (fmUser && fmUser.lastfm_username) {
-    return interaction.reply({ content: `You are already connected as ${fmUser.lastfm_username}.`, flags: 64 });
+    return interaction.reply({ content: `You are already connected as ${fmUser.lastfm_username}.` });
   }
+
+  await interaction.deferReply();
 
   try {
     const response = await axios.get(`http://localhost:8594/auth/${interaction.user.id}`);
@@ -301,10 +303,10 @@ async function handleLogin(interaction: any) {
     const row = new ActionRowBuilder<ButtonBuilder>()
       .addComponents(button);
 
-    await interaction.reply({ embeds: [embed], components: [row], flags: 64 });
+    await interaction.editReply({ embeds: [embed], components: [row] });
   } catch (error) {
     console.error(error);
-    await interaction.reply({ content: 'Failed to initiate Last.fm authentication.', flags: 64 });
+    await interaction.editReply({ content: 'Failed to initiate Last.fm authentication.' });
   }
 }
 
