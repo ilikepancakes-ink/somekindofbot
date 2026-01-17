@@ -278,13 +278,13 @@ async function handleAlbum(interaction: any) {
 }
 
 async function handleLogin(interaction: any) {
+  await interaction.deferReply();
+
   const fmUser = await getFMUser(interaction.user.id);
 
   if (fmUser && fmUser.lastfm_username) {
-    return interaction.reply({ content: `You are already connected as ${fmUser.lastfm_username}.` });
+    return interaction.editReply({ content: `You are already connected as ${fmUser.lastfm_username}.` });
   }
-
-  await interaction.deferReply();
 
   try {
     const response = await axios.get(`http://localhost:8594/auth/${interaction.user.id}`);
