@@ -52,7 +52,13 @@ app.get('/callback', async (req, res) => {
 
     const headers = oauth.toHeader(oauth.authorize(request_data));
 
-    const response = await axios.post(request_data.url, request_data.data, { headers });
+    const params = new URLSearchParams(request_data.data);
+    const response = await axios.post(request_data.url, params.toString(), {
+      headers: {
+        ...headers,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
 
     const sessionKey = response.data.session.key;
     const username = response.data.session.name;
