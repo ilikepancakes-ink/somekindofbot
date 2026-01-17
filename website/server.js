@@ -40,7 +40,7 @@ app.get('/auth/:user_id', async (req, res) => {
       url: 'https://ws.audioscrobbler.com/2.0/',
       method: 'POST',
       data: {
-        method: 'auth.getRequestToken',
+        method: 'auth.getToken',
         api_key: process.env.LASTFM_API_KEY,
       },
     };
@@ -57,15 +57,14 @@ app.get('/auth/:user_id', async (req, res) => {
 
     // Parse XML response
     const xml = response.data;
-    const tokenMatch = xml.match(/<oauth_token>(.*?)<\/oauth_token>/);
-    const secretMatch = xml.match(/<oauth_token_secret>(.*?)<\/oauth_token_secret>/);
+    const tokenMatch = xml.match(/<token>(.*?)<\/token>/);
 
-    if (!tokenMatch || !secretMatch) {
+    if (!tokenMatch) {
       throw new Error('Invalid response from Last.fm');
     }
 
     const request_token = tokenMatch[1];
-    const request_token_secret = secretMatch[1];
+    const request_token_secret = '';
 
     // Store
     await setFMRequestToken({
