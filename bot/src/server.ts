@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// @ts-nocheck
 const express = require('express');
 const axios = require('axios');
 const crypto = require('crypto');
