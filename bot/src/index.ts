@@ -33,7 +33,7 @@ async function loadCommands() {
   // Determine file extension based on current file (ts for dev, js for built)
   const fileExtension = __filename.endsWith('.ts') ? '.ts' : '.js';
 
-  for (const folder of commandFolders) {
+  for (const folder of commandFolders) 
     const folderPath = path.join(commandsPath, folder);
     const commandFiles = fs.readdirSync(folderPath).filter(file => file.endsWith(fileExtension));
 
@@ -67,7 +67,7 @@ async function loadCommands() {
   );
 
   console.log(`Successfully reloaded ${data.length} application (/) commands.`);
-}
+ }
 
 async function main() {
   try {

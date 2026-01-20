@@ -1,6 +1,7 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { promises as fs } from 'fs';
-import { join } from 'path';
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, InteractionContextType } from 'discord.js';
+import axios from 'axios';
+import * as path from 'path';
+const { getGuildStats } = require(path.join(__dirname, '../../database'));
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -21,7 +22,7 @@ module.exports = {
         .setDescription('The reason for the timeout')
         .setRequired(false))
     .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
-    .setDMPermission(true),
+    .setContexts([InteractionContextType.Guild]),
 
   async execute(interaction: any) {
     if (!interaction.guild) {
@@ -39,12 +40,31 @@ module.exports = {
       await target.timeout(duration * 60 * 1000, reason);
       await interaction.reply(`${target.user.username} has been timed out for ${duration} minutes. Reason: ${reason}`);
 
-      // Log the timeout in CET
-      const logsDir = join(__dirname, '../../logs');
-      await fs.mkdir(logsDir, { recursive: true });
-      const timestamp = new Date().toLocaleString('en-GB', { timeZone: 'CET' });
-      const logEntry = `[${timestamp}] User ${target.user.tag} timed out for ${duration} minutes in ${interaction.guild.name} by ${interaction.user.tag}. Reason: ${reason}\n`;
-      await fs.appendFile(join(logsDir, 'timeouts.log'), logEntry);
+      // Send log to webhook
+      const stats = await getGuildStats(interaction.guild.id);
+      if (stats && stats.log_webhook_url) {
+        const logEmbed = new EmbedBuilder()
+          .setTitle('⏰ User Timed Out')
+          .setDescription(`${target.user.username} was timed out for ${duration} minutes`)
+          .addFields(
+            { name: 'User', value: `${target.user}`, inline: true },
+            { name: 'User ID', value: target.user.id, inline: true },
+            { name: 'Duration', value: `${duration} minutes`, inline: true },
+            { name: 'Moderator', value: `${interaction.user}`, inline: true },
+            { name: 'Reason', value: reason, inline: false }
+          )
+          .setColor(0xFFFF00)
+          .setThumbnail(target.user.displayAvatarURL({ dynamic: true }))
+          .setTimestamp();
+
+        try {
+          await axios.post(stats.log_webhook_url, {
+            embeds: [logEmbed.toJSON()]
+          });
+        } catch (logError) {
+          console.error('Error sending log to webhook:', logError);
+        }
+      }
     } catch (error) {
       console.error(error);
       await interaction.reply({ content: 'Failed to timeout the user.', flags: 64 });

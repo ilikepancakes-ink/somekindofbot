@@ -5,17 +5,17 @@ const { getGuildStats } = require(path.join(__dirname, '../../database'));
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('ban')
-    .setDescription('Bans a user from the server')
+    .setName('warn')
+    .setDescription('Warns a user')
     .addUserOption(option =>
       option.setName('target')
-        .setDescription('The user to ban')
+        .setDescription('The user to warn')
         .setRequired(true))
     .addStringOption(option =>
       option.setName('reason')
-        .setDescription('The reason for the ban')
+        .setDescription('The reason for the warning')
         .setRequired(false))
-    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+    .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
     .setContexts([InteractionContextType.Guild]),
 
   async execute(interaction: any) {
@@ -27,22 +27,21 @@ module.exports = {
     const reason = interaction.options.getString('reason') || 'No reason provided';
 
     try {
-      await interaction.guild.members.ban(target, { reason });
-      await interaction.reply(`${target.username} has been banned for: ${reason}`);
+      await interaction.reply(`${target.username} has been warned for: ${reason}`);
 
       // Send log to webhook
       const stats = await getGuildStats(interaction.guild.id);
       if (stats && stats.log_webhook_url) {
         const logEmbed = new EmbedBuilder()
-          .setTitle('🔨 User Banned')
-          .setDescription(`${target.username} was banned from the server`)
+          .setTitle('⚠️ User Warned')
+          .setDescription(`${target.username} was warned`)
           .addFields(
             { name: 'User', value: `${target}`, inline: true },
             { name: 'User ID', value: target.id, inline: true },
             { name: 'Moderator', value: `${interaction.user}`, inline: true },
             { name: 'Reason', value: reason, inline: false }
           )
-          .setColor(0xFF0000)
+          .setColor(0xFFA500)
           .setThumbnail(target.displayAvatarURL({ dynamic: true }))
           .setTimestamp();
 
@@ -56,7 +55,7 @@ module.exports = {
       }
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Failed to ban the user.', flags: 64 });
+      await interaction.reply({ content: 'Failed to warn the user.', flags: 64 });
     }
   },
 };
