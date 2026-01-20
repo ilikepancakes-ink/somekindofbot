@@ -1,8 +1,8 @@
-import express from 'express';
-import axios from 'axios';
-import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
+const express = require('express');
+const axios = require('axios');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 import { getSession, setSession, deleteExpiredSessions, getTicketsByGuild, getTicketMessages } from './database';
 
 const app = express();
