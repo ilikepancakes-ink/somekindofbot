@@ -74,6 +74,31 @@ module.exports = {
     const targetMember = interaction.options.getMember('target');
     const reason = interaction.options.getString('reason') || 'No reason provided';
 
+    // Check permissions
+    const member = interaction.member;
+    if (!member.permissions.has) {
+      return await interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
+    }
+
+    switch (subcommand) {
+      case 'ban':
+        if (!member.permissions.has('BanMembers')) {
+          return await interaction.reply({ content: 'You need Ban Members permission to use this command.', flags: 64 });
+        }
+        break;
+      case 'kick':
+      case 'warn':
+        if (!member.permissions.has('KickMembers')) {
+          return await interaction.reply({ content: 'You need Kick Members permission to use this command.', flags: 64 });
+        }
+        break;
+      case 'timeout':
+        if (!member.permissions.has('ModerateMembers')) {
+          return await interaction.reply({ content: 'You need Moderate Members permission to use this command.', flags: 64 });
+        }
+        break;
+    }
+
     const embed = new EmbedBuilder()
       .setTimestamp()
       .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) });
