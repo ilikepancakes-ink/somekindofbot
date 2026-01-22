@@ -64,7 +64,7 @@ Een willekeurig project dat ik één dag geleden heb gemaakt, omdat ik een beetj
 ### Hoe te deployen
 1. Clone het repo:
 ```bash
-git clone https://github.com/ilikepancakes-ink/soortbot.git
+git clone https://github.com/ilikepancakes-ink/somekindofbot.git
 ```
 
 2. Installeer alle benodigde pakketten:
