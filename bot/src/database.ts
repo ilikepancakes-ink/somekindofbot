@@ -105,6 +105,24 @@ db.run(`CREATE TABLE IF NOT EXISTS role_embeds (
   roles TEXT
 )`);
 
+// Better embeds settings
+db.run(`CREATE TABLE IF NOT EXISTS better_embeds_settings (
+  guild_id TEXT PRIMARY KEY,
+  enabled BOOLEAN DEFAULT 0
+)`);
+
+// Better embeds messages
+db.run(`CREATE TABLE IF NOT EXISTS better_embeds_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT,
+  channel_id TEXT,
+  message_id TEXT,
+  original_message_id TEXT,
+  platform TEXT,
+  url TEXT,
+  created_at INTEGER
+)`);
+
 interface GuildStats {
   guild_id: string;
   member_channel_id?: string;
@@ -163,6 +181,22 @@ interface RoleEmbed {
   title: string;
   description: string;
   roles: string; // JSON string of role IDs
+}
+
+interface BetterEmbedsSettings {
+  guild_id: string;
+  enabled: boolean;
+}
+
+interface BetterEmbedsMessage {
+  id?: number;
+  guild_id: string;
+  channel_id: string;
+  message_id: string;
+  original_message_id: string;
+  platform: string;
+  url: string;
+  created_at: number;
 }
 
 function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
@@ -417,6 +451,59 @@ function deleteRoleEmbed(messageId: string): Promise<void> {
   });
 }
 
+function getBetterEmbedsSettings(guildId: string): Promise<BetterEmbedsSettings | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM better_embeds_settings WHERE guild_id = ?', [guildId], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row as BetterEmbedsSettings | undefined);
+    });
+  });
+}
+
+function setBetterEmbedsSettings(settings: BetterEmbedsSettings): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT OR REPLACE INTO better_embeds_settings (guild_id, enabled) VALUES (?, ?)',
+      [settings.guild_id, settings.enabled ? 1 : 0],
+      (err: any) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+function createBetterEmbedsMessage(message: BetterEmbedsMessage): Promise<number> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO better_embeds_messages (guild_id, channel_id, message_id, original_message_id, platform, url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [message.guild_id, message.channel_id, message.message_id, message.original_message_id, message.platform, message.url, message.created_at],
+      function(this: any, err: any) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      }
+    );
+  });
+}
+
+function getBetterEmbedsMessageByOriginal(originalMessageId: string): Promise<BetterEmbedsMessage | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM better_embeds_messages WHERE original_message_id = ?', [originalMessageId], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row as BetterEmbedsMessage | undefined);
+    });
+  });
+}
+
+function deleteBetterEmbedsMessage(originalMessageId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM better_embeds_messages WHERE original_message_id = ?', [originalMessageId], (err: any) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
 // EU please for the love of god dont burn my house down for collecting too much user data pweease i swear ill abide by the GDPR >.<
 export {
   getGuildStats,
@@ -442,4 +529,9 @@ export {
   createRoleEmbed,
   getRoleEmbedByMessage,
   deleteRoleEmbed,
+  getBetterEmbedsSettings,
+  setBetterEmbedsSettings,
+  createBetterEmbedsMessage,
+  getBetterEmbedsMessageByOriginal,
+  deleteBetterEmbedsMessage,
 };
