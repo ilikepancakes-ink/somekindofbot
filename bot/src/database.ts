@@ -94,6 +94,17 @@ db.run(`CREATE TABLE IF NOT EXISTS fm_request_tokens (
   request_token_secret TEXT
 )`);
 
+// Role embeds for persistent role selection
+db.run(`CREATE TABLE IF NOT EXISTS role_embeds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT,
+  channel_id TEXT,
+  message_id TEXT,
+  title TEXT,
+  description TEXT,
+  roles TEXT
+)`);
+
 interface GuildStats {
   guild_id: string;
   member_channel_id?: string;
@@ -142,6 +153,16 @@ interface FMRequestToken {
   discord_user_id: string;
   request_token: string;
   request_token_secret: string;
+}
+
+interface RoleEmbed {
+  id?: number;
+  guild_id: string;
+  channel_id: string;
+  message_id: string;
+  title: string;
+  description: string;
+  roles: string; // JSON string of role IDs
 }
 
 function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
@@ -365,6 +386,37 @@ function setFMRequestToken(token: FMRequestToken): Promise<void> {
   });
 }
 
+function createRoleEmbed(roleEmbed: RoleEmbed): Promise<number> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO role_embeds (guild_id, channel_id, message_id, title, description, roles) VALUES (?, ?, ?, ?, ?, ?)',
+      [roleEmbed.guild_id, roleEmbed.channel_id, roleEmbed.message_id, roleEmbed.title, roleEmbed.description, roleEmbed.roles],
+      function(this: any, err: any) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      }
+    );
+  });
+}
+
+function getRoleEmbedByMessage(messageId: string): Promise<RoleEmbed | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM role_embeds WHERE message_id = ?', [messageId], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row as RoleEmbed | undefined);
+    });
+  });
+}
+
+function deleteRoleEmbed(messageId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run('DELETE FROM role_embeds WHERE message_id = ?', [messageId], (err: any) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
 // EU please for the love of god dont burn my house down for collecting too much user data pweease i swear ill abide by the GDPR >.<
 export {
   getGuildStats,
@@ -387,4 +439,7 @@ export {
   setFMUser,
   getFMRequestToken,
   setFMRequestToken,
+  createRoleEmbed,
+  getRoleEmbedByMessage,
+  deleteRoleEmbed,
 };

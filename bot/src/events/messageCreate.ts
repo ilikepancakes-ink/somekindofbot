@@ -1,7 +1,12 @@
 import { Events } from 'discord.js';
 import * as path from 'path';
 const { getTicketByChannel, createTicketMessage } = require(path.join(__dirname, '../database'));
-const { getXPSettings, addXP, getXPUser, getXPLevel, getAllXPLevels } = require(path.join(__dirname, '../xpDatabase'));
+const { getXPSettings, addXP, getXPUser, getXPLevel, getAllXPLevels, getXPBlockedRoles } = require(path.join(__dirname, '../xpDatabase'));
+
+interface XPBlockedRole {
+  guild_id: string;
+  role_id: string;
+}
 
 module.exports = {
   name: Events.MessageCreate,
@@ -17,40 +22,46 @@ module.exports = {
           const settings = await getXPSettings(message.guild.id);
           console.log(`XP Debug: Guild ${message.guild.name}, Settings:`, settings);
           if (settings && settings.enabled) {
-            // Get current XP
-            const userXP = await getXPUser(message.guild.id, message.author.id);
-            const currentXP = userXP ? userXP.xp : 0;
-            const oldLevel = Math.floor(currentXP / 100);
+            // Check if user has blocked roles
+            const member = await message.guild.members.fetch(message.author.id);
+            const blockedRoles = await getXPBlockedRoles(message.guild.id);
+            const hasBlockedRole = blockedRoles.some((blockedRole: XPBlockedRole) => member.roles.cache.has(blockedRole.role_id));
 
-            // Add 3 XP
-            await addXP(message.guild.id, message.author.id, 3);
+            if (!hasBlockedRole) {
+              // Get current XP
+              const userXP = await getXPUser(message.guild.id, message.author.id);
+              const currentXP = userXP ? userXP.xp : 0;
+              const oldLevel = Math.floor(currentXP / 100);
 
-            // Check for level up
-            const newXP = currentXP + 3;
-            const newLevel = Math.floor(newXP / 100);
+              // Add 3 XP
+              await addXP(message.guild.id, message.author.id, 3);
 
-            if (newLevel > oldLevel) {
-              // User leveled up
-              const levelRole = await getXPLevel(message.guild.id, newLevel);
-              if (levelRole) {
-                try {
-                  const member = await message.guild.members.fetch(message.author.id);
-                  await member.roles.add(levelRole.role_id);
-                } catch (error) {
-                  console.error('Error assigning level role:', error);
+              // Check for level up
+              const newXP = currentXP + 3;
+              const newLevel = Math.floor(newXP / 100);
+
+              if (newLevel > oldLevel) {
+                // User leveled up
+                const levelRole = await getXPLevel(message.guild.id, newLevel);
+                if (levelRole) {
+                  try {
+                    await member.roles.add(levelRole.role_id);
+                  } catch (error) {
+                    console.error('Error assigning level role:', error);
+                  }
                 }
-              }
 
-              // Send DM to user
-              try {
-                const nextLevel = newLevel + 1;
-                const requiredXP = nextLevel * 100;
-                const dmMessage = `Congrats, ${message.author.username}! you are now at ${newXP}xp and at level${newLevel}! next level is ${nextLevel} and that needs ${requiredXP}! remember you get 3 xp for every message and 1 xp for every reaction!`;
+                // Send DM to user
+                try {
+                  const nextLevel = newLevel + 1;
+                  const requiredXP = nextLevel * 100;
+                  const dmMessage = `Congrats, ${message.author.username}! you are now at ${newXP}xp and at level${newLevel}! next level is ${nextLevel} and that needs ${requiredXP}! remember you get 3 xp for every message and 1 xp for every reaction!`;
 
-                await message.author.send(dmMessage);
-              } catch (error) {
-                console.error('Error sending level up DM:', error);
-                // User might have DMs disabled, which is fine
+                  await message.author.send(dmMessage);
+                } catch (error) {
+                  console.error('Error sending level up DM:', error);
+                  // User might have DMs disabled, which is fine
+                }
               }
             }
           }

@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, InteractionContextType, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import * as path from 'path';
-const { getXPSettings, setXPSettings, getTopXPUsers, setXPLevel, getAllXPLevels, getXPUser, addXP, removeXP, clearUserXP, nukeGuildXP } = require(path.join(__dirname, '../../xpDatabase'));
+const { getXPSettings, setXPSettings, getTopXPUsers, setXPLevel, getAllXPLevels, getXPUser, addXP, removeXP, clearUserXP, nukeGuildXP, addXPBlockedRole, removeXPBlockedRole } = require(path.join(__dirname, '../../xpDatabase'));
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -30,6 +30,26 @@ module.exports = {
             .addRoleOption(option =>
               option.setName('role')
                 .setDescription('The role to give at this level')
+                .setRequired(true))))
+    .addSubcommandGroup(group =>
+      group
+        .setName('role')
+        .setDescription('Manage XP blocked roles')
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('block')
+            .setDescription('Block a role from getting XP')
+            .addRoleOption(option =>
+              option.setName('role')
+                .setDescription('The role to block from XP')
+                .setRequired(true)))
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('unblock')
+            .setDescription('Unblock a role from getting XP')
+            .addRoleOption(option =>
+              option.setName('role')
+                .setDescription('The role to unblock from XP')
                 .setRequired(true))))
     .addSubcommandGroup(group =>
       group
@@ -205,6 +225,21 @@ module.exports = {
           components: [row],
           flags: 64 // Ephemeral
         });
+      } else if (subcommandGroup === 'role' && subcommand === 'block') {
+        const role = interaction.options.getRole('role');
+
+        await addXPBlockedRole({
+          guild_id: interaction.guild.id,
+          role_id: role.id
+        });
+
+        await interaction.reply(`The ${role.name} role has been blocked from getting XP!`);
+      } else if (subcommandGroup === 'role' && subcommand === 'unblock') {
+        const role = interaction.options.getRole('role');
+
+        await removeXPBlockedRole(interaction.guild.id, role.id);
+
+        await interaction.reply(`The ${role.name} role has been unblocked from getting XP!`);
       }
     } catch (error) {
       console.error('XP command error:', error);

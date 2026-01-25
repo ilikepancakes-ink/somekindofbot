@@ -1,4 +1,6 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import * as path from 'path';
+const { createRoleEmbed } = require(path.join(__dirname, '../../database'));
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -88,6 +90,62 @@ module.exports = {
           option.setName('role')
             .setDescription('The role to get info about')
             .setRequired(true)))
+    .addSubcommandGroup(group =>
+      group
+        .setName('embed')
+        .setDescription('Manage role selection embeds')
+        .addSubcommand(subcommand =>
+          subcommand
+            .setName('create')
+            .setDescription('Create a persistent role selection embed with buttons')
+            .addStringOption(option =>
+              option.setName('title')
+                .setDescription('The title of the embed')
+                .setRequired(true))
+            .addStringOption(option =>
+              option.setName('text')
+                .setDescription('The description text of the embed')
+                .setRequired(true))
+            .addRoleOption(option =>
+              option.setName('role1')
+                .setDescription('First role to select')
+                .setRequired(true))
+            .addRoleOption(option =>
+              option.setName('role2')
+                .setDescription('Second role to select (optional)')
+                .setRequired(false))
+            .addRoleOption(option =>
+              option.setName('role3')
+                .setDescription('Third role to select (optional)')
+                .setRequired(false))
+            .addRoleOption(option =>
+              option.setName('role4')
+                .setDescription('Fourth role to select (optional)')
+                .setRequired(false))
+            .addRoleOption(option =>
+              option.setName('role5')
+                .setDescription('Fifth role to select (optional)')
+                .setRequired(false))
+            .addRoleOption(option =>
+              option.setName('role6')
+                .setDescription('Sixth role to select (optional)')
+                .setRequired(false))
+            .addRoleOption(option =>
+              option.setName('role7')
+                .setDescription('Seventh role to select (optional)')
+                .setRequired(false))
+            .addRoleOption(option =>
+              option.setName('role8')
+                .setDescription('Eighth role to select (optional)')
+                .setRequired(false))
+            .addRoleOption(option =>
+              option.setName('role9')
+                .setDescription('Ninth role to select (optional)')
+                .setRequired(false))
+            .addRoleOption(option =>
+              option.setName('role10')
+                .setDescription('Tenth role to select (optional)')
+                .setRequired(false))))
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .setDMPermission(true),
 
@@ -95,6 +153,7 @@ module.exports = {
     if (!interaction.guild) {
       return await interaction.reply({ content: 'This command can only be used in a server.', flags: 64 });
     }
+    const subcommandGroup = interaction.options.getSubcommandGroup();
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'create') {
@@ -205,6 +264,70 @@ module.exports = {
       };
 
       await interaction.reply({ embeds: [embed] });
+    } else if (subcommandGroup === 'embed' && subcommand === 'create') {
+      const title = interaction.options.getString('title');
+      const text = interaction.options.getString('text');
+
+      // Collect all provided roles
+      const roles = [];
+      for (let i = 1; i <= 10; i++) {
+        const role = interaction.options.getRole(`role${i}`);
+        if (role) roles.push(role);
+      }
+
+      if (roles.length === 0) {
+        return await interaction.reply({ content: 'At least one role must be provided.', flags: 64 });
+      }
+
+      try {
+        // Create the embed
+        const embed = new EmbedBuilder()
+          .setTitle(title)
+          .setDescription(text)
+          .setColor(0x0099FF)
+          .setTimestamp();
+
+        // Create buttons for each role
+        const components = [];
+        let currentRow = new ActionRowBuilder<ButtonBuilder>();
+
+        for (let i = 0; i < roles.length; i++) {
+          const role = roles[i];
+          const button = new ButtonBuilder()
+            .setCustomId(`role_select_${role.id}`)
+            .setLabel(role.name)
+            .setStyle(ButtonStyle.Primary);
+
+          currentRow.addComponents(button);
+
+          // Discord allows max 5 buttons per row
+          if (currentRow.components.length === 5 || i === roles.length - 1) {
+            components.push(currentRow);
+            currentRow = new ActionRowBuilder<ButtonBuilder>();
+          }
+        }
+
+        // Send the message
+        const message = await interaction.reply({
+          embeds: [embed],
+          components: components,
+          fetchReply: true
+        });
+
+        // Save to database
+        await createRoleEmbed({
+          guild_id: interaction.guild.id,
+          channel_id: interaction.channel.id,
+          message_id: message.id,
+          title: title,
+          description: text,
+          roles: JSON.stringify(roles.map(r => r.id))
+        });
+
+      } catch (error) {
+        console.error(error);
+        await interaction.reply({ content: 'Failed to create the role selection embed.', flags: 64 });
+      }
     }
   },
 };

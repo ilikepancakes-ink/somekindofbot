@@ -1,7 +1,7 @@
 import { Events, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, PermissionFlagsBits, OverwriteType, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { rule34Data } from '../commands/nsfw/rule34';
 import * as path from 'path';
-const { getTicketSettings, createTicket } = require(path.join(__dirname, '../database'));
+const { getTicketSettings, createTicket, getRoleEmbedByMessage } = require(path.join(__dirname, '../database'));
 const { nukeGuildXP } = require(path.join(__dirname, '../xpDatabase'));
 
 module.exports = {
@@ -229,6 +229,44 @@ module.exports = {
         }
 
         await interaction.reply({ embeds: [embed], ephemeral: true });
+      } else if (interaction.customId.startsWith('role_select_')) {
+        const roleId = interaction.customId.split('_')[2];
+
+        try {
+          // Get the role embed data
+          const roleEmbed = await getRoleEmbedByMessage(interaction.message.id);
+          if (!roleEmbed) {
+            return await interaction.reply({ content: 'This role selection embed is no longer valid.', flags: 64 });
+          }
+
+          const allowedRoles = JSON.parse(roleEmbed.roles);
+          if (!allowedRoles.includes(roleId)) {
+            return await interaction.reply({ content: 'This role is not available for selection.', flags: 64 });
+          }
+
+          // Get the role
+          const role = interaction.guild.roles.cache.get(roleId);
+          if (!role) {
+            return await interaction.reply({ content: 'Role not found.', flags: 64 });
+          }
+
+          // Get the member
+          const member = await interaction.guild.members.fetch(interaction.user.id);
+
+          // Check if user already has the role
+          if (member.roles.cache.has(roleId)) {
+            // Remove the role
+            await member.roles.remove(role);
+            await interaction.reply({ content: `Removed the ${role.name} role from you!`, flags: 64 });
+          } else {
+            // Add the role
+            await member.roles.add(role);
+            await interaction.reply({ content: `Added the ${role.name} role to you!`, flags: 64 });
+          }
+        } catch (error) {
+          console.error('Error handling role selection:', error);
+          await interaction.reply({ content: 'Failed to process role selection.', flags: 64 });
+        }
       } else {
         // Handle button interactions (for help command pagination)
         // The help command handles its own button interactions

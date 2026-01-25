@@ -28,6 +28,14 @@ xpDb.run(`
   )
 `);
 
+xpDb.run(`
+  CREATE TABLE IF NOT EXISTS xp_blocked_roles (
+    guild_id TEXT,
+    role_id TEXT,
+    PRIMARY KEY (guild_id, role_id)
+  )
+`);
+
 interface XPSettings {
   guild_id: string;
   enabled: number;
@@ -42,6 +50,11 @@ interface XPUser {
 interface XPLevel {
   guild_id: string;
   level: number;
+  role_id: string;
+}
+
+interface XPBlockedRole {
+  guild_id: string;
   role_id: string;
 }
 
@@ -179,7 +192,8 @@ function nukeGuildXP(guildId: string): Promise<void> {
     const queries = [
       'DELETE FROM xp_users WHERE guild_id = ?',
       'DELETE FROM xp_levels WHERE guild_id = ?',
-      'DELETE FROM xp_settings WHERE guild_id = ?'
+      'DELETE FROM xp_settings WHERE guild_id = ?',
+      'DELETE FROM xp_blocked_roles WHERE guild_id = ?'
     ];
 
     let completed = 0;
@@ -191,6 +205,37 @@ function nukeGuildXP(guildId: string): Promise<void> {
         completed++;
         if (completed === total) resolve();
       });
+    });
+  });
+}
+
+function getXPBlockedRoles(guildId: string): Promise<XPBlockedRole[]> {
+  return new Promise((resolve, reject) => {
+    xpDb.all('SELECT * FROM xp_blocked_roles WHERE guild_id = ?', [guildId], (err: any, rows: any) => {
+      if (err) reject(err);
+      else resolve(rows as XPBlockedRole[]);
+    });
+  });
+}
+
+function addXPBlockedRole(blockedRole: XPBlockedRole): Promise<void> {
+  return new Promise((resolve, reject) => {
+    xpDb.run(
+      'INSERT OR IGNORE INTO xp_blocked_roles (guild_id, role_id) VALUES (?, ?)',
+      [blockedRole.guild_id, blockedRole.role_id],
+      (err: any) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+function removeXPBlockedRole(guildId: string, roleId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    xpDb.run('DELETE FROM xp_blocked_roles WHERE guild_id = ? AND role_id = ?', [guildId, roleId], (err: any) => {
+      if (err) reject(err);
+      else resolve();
     });
   });
 }
@@ -209,4 +254,7 @@ export {
   setXPLevel,
   getAllXPLevels,
   deleteXPLevel,
+  getXPBlockedRoles,
+  addXPBlockedRole,
+  removeXPBlockedRole,
 };
