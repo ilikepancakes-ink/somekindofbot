@@ -14,6 +14,8 @@ interface XPBlockedRole {
 }
 
 async function handleBetterEmbeds(message: any) {
+  console.log(`[BetterEmbeds] Checking message ${message.id} in guild ${message.guild?.id}`);
+
   // Check if message has embeds from target platforms
   const targetProviders = ['Spotify', 'YouTube', 'Twitter', 'TikTok', 'Instagram'];
   const relevantEmbeds = message.embeds.filter((embed: any) =>
@@ -22,16 +24,21 @@ async function handleBetterEmbeds(message: any) {
     )
   );
 
+  console.log(`[BetterEmbeds] Found ${relevantEmbeds.length} relevant embeds out of ${message.embeds.length} total embeds`);
+  console.log(`[BetterEmbeds] Embed providers:`, message.embeds.map((e: any) => e.provider?.name));
+
   if (relevantEmbeds.length === 0) return;
 
   // Process each relevant embed
   for (const embed of relevantEmbeds) {
     try {
+      console.log(`[BetterEmbeds] Processing embed from provider: ${embed.provider?.name}`);
       if (embed.provider?.name?.toLowerCase().includes('spotify')) {
         await handleSpotifyEmbed(message, embed);
       } else if (embed.provider?.name?.toLowerCase().includes('youtube') ||
                  embed.provider?.name?.toLowerCase().includes('tiktok') ||
-                 embed.provider?.name?.toLowerCase().includes('instagram')) {
+                 embed.provider?.name?.toLowerCase().includes('instagram') ||
+                 embed.provider?.name?.toLowerCase().includes('twitter')) {
         await handleVideoEmbed(message, embed);
       }
     } catch (error) {
