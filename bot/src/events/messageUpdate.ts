@@ -52,17 +52,52 @@ async function handleSpotifyEmbed(message: any, embed: any) {
   if (!trackId) return;
 
   try {
-    const accessToken = await getSpotifyAccessToken();
-    const trackData = await axios.get(`https://api.spotify.com/v1/tracks/${trackId}`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
+    let accessToken = await getSpotifyAccessToken();
+
+    // Get track data
+    let trackData;
+    try {
+      trackData = await axios.get(`https://api.spotify.com/v1/tracks/${trackId}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+    } catch (error: any) {
+      if (error.response?.status === 403 || error.response?.status === 401) {
+        console.log('[BetterEmbeds] Spotify token expired, refreshing...');
+        // Clear cached token to force refresh
+        spotifyToken = null;
+        accessToken = await getSpotifyAccessToken();
+        trackData = await axios.get(`https://api.spotify.com/v1/tracks/${trackId}`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+      } else {
+        throw error;
+      }
+    }
 
     const track = trackData.data;
 
     // Get audio features for additional stats
-    const audioFeaturesData = await axios.get(`https://api.spotify.com/v1/audio-features/${trackId}`, {
-      headers: { 'Authorization': `Bearer ${accessToken}` }
-    });
+    let audioFeaturesData;
+    try {
+      audioFeaturesData = await axios.get(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+    } catch (error: any) {
+      if (error.response?.status === 403 || error.response?.status === 401) {
+        console.log('[BetterEmbeds] Spotify token expired during audio features fetch, refreshing...');
+        // Clear cached token to force refresh
+        spotifyToken = null;
+        accessToken = await getSpotifyAccessToken();
+        audioFeaturesData = await axios.get(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+      } else {
+        // If audio features fail, continue without them
+        console.log('[BetterEmbeds] Could not fetch audio features, continuing without them');
+        audioFeaturesData = { data: { key: -1, tempo: 0, danceability: 0, energy: 0 } };
+      }
+    }
+
     const audioFeatures = audioFeaturesData.data;
 
     const spotifyEmbed = new EmbedBuilder()
@@ -201,6 +236,8 @@ function extractSpotifyId(url: string): string | null {
   return match ? match[1] : null;
 }
 
+let spotifyToken: { token: string; expires: number } | null = null;
+
 async function getSpotifyAccessToken(): Promise<string> {
   const clientId = process.env.SPOTIFY_CLIENT_ID;
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -209,12 +246,24 @@ async function getSpotifyAccessToken(): Promise<string> {
     throw new Error('Spotify credentials not configured');
   }
 
+  // Check if we have a valid token
+  if (spotifyToken && spotifyToken.expires > Date.now()) {
+    return spotifyToken.token;
+  }
+
+  // Get new token
   const response = await axios.post('https://accounts.spotify.com/api/token', null, {
     params: { grant_type: 'client_credentials' },
     auth: { username: clientId, password: clientSecret }
   });
 
-  return response.data.access_token;
+  // Store token with expiration (tokens are valid for 1 hour)
+  spotifyToken = {
+    token: response.data.access_token,
+    expires: Date.now() + (response.data.expires_in * 1000) - 60000 // Refresh 1 minute early
+  };
+
+  return spotifyToken.token;
 }
 
 function formatDuration(ms: number): string {
