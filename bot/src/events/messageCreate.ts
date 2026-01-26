@@ -15,6 +15,7 @@ interface XPBlockedRole {
 
 async function handleBetterEmbeds(message: any) {
   console.log(`[BetterEmbeds] Checking message ${message.id} in guild ${message.guild?.id}`);
+  console.log(`[BetterEmbeds] Message content: "${message.content}"`);
 
   // Check if message has embeds from target platforms
   const targetProviders = ['Spotify', 'YouTube', 'Twitter', 'TikTok', 'Instagram'];
@@ -27,7 +28,28 @@ async function handleBetterEmbeds(message: any) {
   console.log(`[BetterEmbeds] Found ${relevantEmbeds.length} relevant embeds out of ${message.embeds.length} total embeds`);
   console.log(`[BetterEmbeds] Embed providers:`, message.embeds.map((e: any) => e.provider?.name));
 
-  if (relevantEmbeds.length === 0) return;
+  // If no embeds found, check for URLs in message content as fallback
+  if (relevantEmbeds.length === 0) {
+    const urls = extractUrlsFromMessage(message.content);
+    console.log(`[BetterEmbeds] Found ${urls.length} URLs in message content:`, urls);
+
+    for (const url of urls) {
+      const platform = detectPlatformFromUrl(url);
+      if (platform) {
+        console.log(`[BetterEmbeds] Processing URL from platform: ${platform} - ${url}`);
+        try {
+          if (platform === 'spotify') {
+            await handleSpotifyUrl(message, url);
+          } else if (['youtube', 'tiktok', 'instagram', 'twitter'].includes(platform)) {
+            await handleVideoUrl(message, url, platform);
+          }
+        } catch (error) {
+          console.error('Error processing URL:', error);
+        }
+      }
+    }
+    return;
+  }
 
   // Process each relevant embed
   for (const embed of relevantEmbeds) {
@@ -268,6 +290,195 @@ function formatFileSize(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
 }
+
+function extractUrlsFromMessage(content: string): string[] {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const matches = content.match(urlRegex);
+  return matches || [];
+}
+
+function detectPlatformFromUrl(url: string): string | null {
+  if (url.includes('spotify.com')) return 'spotify';
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+  if (url.includes('tiktok.com')) return 'tiktok';
+  if (url.includes('instagram.com')) return 'instagram';
+  if (url.includes('twitter.com') || url.includes('x.com')) return 'twitter';
+  return null;
+}
+
+async function handleSpotifyUrl(message: any, url: string) {
+  // Extract Spotify ID and create a mock embed object
+  const trackId = extractSpotifyId(url);
+  if (!trackId) return;
+
+  try {
+    const accessToken = await getSpotifyAccessToken();
+
+    // Get track data
+    let trackData;
+    try {
+      trackData = await axios.get(`https://api.spotify.com/v1/tracks/${trackId}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+    } catch (error: any) {
+      if (error.response?.status === 403 || error.response?.status === 401) {
+        console.log('[BetterEmbeds] Spotify token expired, refreshing...');
+        // Clear cached token to force refresh
+        spotifyToken = null;
+        const newToken = await getSpotifyAccessToken();
+        trackData = await axios.get(`https://api.spotify.com/v1/tracks/${trackId}`, {
+          headers: { 'Authorization': `Bearer ${newToken}` }
+        });
+      } else {
+        throw error;
+      }
+    }
+
+    const track = trackData.data;
+
+    // Get audio features for additional stats
+    let audioFeaturesData;
+    try {
+      audioFeaturesData = await axios.get(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+    } catch (error: any) {
+      if (error.response?.status === 403 || error.response?.status === 401) {
+        console.log('[BetterEmbeds] Spotify token expired during audio features fetch, refreshing...');
+        // Clear cached token to force refresh
+        spotifyToken = null;
+        const newToken = await getSpotifyAccessToken();
+        audioFeaturesData = await axios.get(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+          headers: { 'Authorization': `Bearer ${newToken}` }
+        });
+      } else {
+        // If audio features fail, continue without them
+        console.log('[BetterEmbeds] Could not fetch audio features, continuing without them');
+        audioFeaturesData = { data: { key: -1, tempo: 0, danceability: 0, energy: 0 } };
+      }
+    }
+
+    const audioFeatures = audioFeaturesData.data;
+
+    const spotifyEmbed = new EmbedBuilder()
+      .setTitle(`🎵 ${track.name}`)
+      .setDescription(`By ${track.artists.map((a: any) => a.name).join(', ')}`)
+      .setURL(url)
+      .setThumbnail(track.album.images[0]?.url)
+      .setColor(0x1DB954)
+      .addFields(
+        { name: 'Album', value: track.album.name, inline: true },
+        { name: 'Duration', value: formatDuration(track.duration_ms), inline: true },
+        { name: 'Popularity', value: `${track.popularity}/100`, inline: true },
+        { name: 'Key', value: getKeyName(audioFeatures.key), inline: true },
+        { name: 'BPM', value: `${Math.round(audioFeatures.tempo)}`, inline: true },
+        { name: 'Danceability', value: `${Math.round(audioFeatures.danceability * 100)}%`, inline: true },
+        { name: 'Energy', value: `${Math.round(audioFeatures.energy * 100)}%`, inline: true },
+        { name: 'Release Date', value: new Date(track.album.release_date).getFullYear().toString(), inline: true }
+      )
+      .setFooter({ text: `Spotify • ${track.album.total_tracks} tracks in album` });
+
+    // Create visit button
+    const visitButton = new ButtonBuilder()
+      .setLabel('🎧 Listen on Spotify')
+      .setStyle(ButtonStyle.Link)
+      .setURL(url);
+
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(visitButton);
+
+    // Send the embed message
+    const sentMessage = await message.channel.send({
+      embeds: [spotifyEmbed],
+      components: [row]
+    });
+
+    // Store in database for persistence
+    await createBetterEmbedsMessage({
+      guild_id: message.guild.id,
+      channel_id: message.channel.id,
+      message_id: sentMessage.id,
+      original_message_id: message.id,
+      platform: 'spotify',
+      url: url,
+      created_at: Date.now()
+    });
+
+  } catch (error) {
+    console.error('Error fetching Spotify data:', error);
+  }
+}
+
+async function handleVideoUrl(message: any, url: string, platform: string) {
+  try {
+    // Get video info using yt-dlp
+    const infoCommand = `yt-dlp --dump-json "${url}"`;
+    const infoOutput = await execAsync(infoCommand);
+    const videoInfo = JSON.parse(infoOutput.stdout);
+
+    // Determine platform emoji
+    let platformEmoji = '🎥';
+    if (platform === 'youtube') platformEmoji = '📺';
+    else if (platform === 'tiktok') platformEmoji = '🎵';
+    else if (platform === 'instagram') platformEmoji = '📸';
+    else if (platform === 'twitter') platformEmoji = '🐦';
+
+    // Create embed with video stats
+    const videoEmbed = new EmbedBuilder()
+      .setTitle(`${platformEmoji} ${videoInfo.title || 'Video'}`)
+      .setURL(url)
+      .setThumbnail(videoInfo.thumbnail)
+      .setColor(getPlatformColor(platform.charAt(0).toUpperCase() + platform.slice(1)))
+      .addFields(
+        { name: 'Duration', value: formatDuration(videoInfo.duration * 1000), inline: true },
+        { name: 'Views', value: formatNumber(videoInfo.view_count || 0), inline: true },
+        { name: 'Likes', value: formatNumber(videoInfo.like_count || 0), inline: true },
+        { name: 'Uploader', value: videoInfo.uploader || 'Unknown', inline: true },
+        { name: 'Upload Date', value: formatDate(videoInfo.upload_date), inline: true },
+        { name: 'Resolution', value: `${videoInfo.width}x${videoInfo.height}`, inline: true }
+      )
+      .setFooter({ text: `${platform.charAt(0).toUpperCase() + platform.slice(1)} • ${formatFileSize(videoInfo.filesize || videoInfo.filesize_approx || 0)}` });
+
+    // Create visit button
+    const visitButton = new ButtonBuilder()
+      .setLabel(`🔗 View on ${platform.charAt(0).toUpperCase() + platform.slice(1)}`)
+      .setStyle(ButtonStyle.Link)
+      .setURL(url);
+
+    const row = new ActionRowBuilder<ButtonBuilder>()
+      .addComponents(visitButton);
+
+    // Download and upload video
+    const tempFile = `/tmp/${Date.now()}_${Math.random()}.mp4`;
+    await execAsync(`yt-dlp -f best[height<=720] -o "${tempFile}" "${url}"`);
+
+    // Send embed with video attachment
+    const sentMessage = await message.channel.send({
+      embeds: [videoEmbed],
+      files: [{ attachment: tempFile, name: 'video.mp4' }],
+      components: [row]
+    });
+
+    // Store in database for persistence
+    await createBetterEmbedsMessage({
+      guild_id: message.guild.id,
+      channel_id: message.channel.id,
+      message_id: sentMessage.id,
+      original_message_id: message.id,
+      platform: platform,
+      url: url,
+      created_at: Date.now()
+    });
+
+    // Clean up temp file
+    fs.unlinkSync(tempFile);
+
+  } catch (error) {
+    console.error('Error processing video URL:', error);
+  }
+}
+
+let spotifyToken: { token: string; expires: number } | null = null;
 
 module.exports = {
   name: Events.MessageCreate,
