@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, InteractionContextType } from 'discord.js';
 import axios from 'axios';
 import * as path from 'path';
-const { getGuildStats } = require(path.join(__dirname, '../../database'));
+const { getGuildStats, createModerationLog } = require(path.join(__dirname, '../../database'));
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -112,6 +112,17 @@ module.exports = {
       switch (subcommand) {
         case 'ban':
           await interaction.guild.members.ban(targetUser, { reason });
+          
+          // Log the moderation action
+          await createModerationLog({
+            guild_id: interaction.guild.id,
+            user_id: targetUser.id,
+            moderator_id: interaction.user.id,
+            action_type: 'ban',
+            reason: reason,
+            timestamp: Date.now()
+          });
+          
           title = '🔨 User Banned';
           description = `${targetUser.username} has been banned from the server`;
           color = 0xFF0000;
@@ -128,6 +139,17 @@ module.exports = {
             return await interaction.reply({ content: 'User not found in this server.', flags: 64 });
           }
           await targetMember.kick(reason);
+          
+          // Log the moderation action
+          await createModerationLog({
+            guild_id: interaction.guild.id,
+            user_id: targetUser.id,
+            moderator_id: interaction.user.id,
+            action_type: 'kick',
+            reason: reason,
+            timestamp: Date.now()
+          });
+          
           title = '👢 User Kicked';
           description = `${targetMember.user.username} has been kicked from the server`;
           color = 0xFFA500;
@@ -145,6 +167,18 @@ module.exports = {
           }
           const duration = interaction.options.getInteger('duration');
           await targetMember.timeout(duration * 60 * 1000, reason);
+          
+          // Log the moderation action
+          await createModerationLog({
+            guild_id: interaction.guild.id,
+            user_id: targetUser.id,
+            moderator_id: interaction.user.id,
+            action_type: 'timeout',
+            reason: reason,
+            duration: duration,
+            timestamp: Date.now()
+          });
+          
           const endTime = new Date(Date.now() + duration * 60 * 1000);
           const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false });
           title = '⏰ User Timed Out';
@@ -161,6 +195,16 @@ module.exports = {
           break;
 
         case 'warn':
+          // Log the moderation action
+          await createModerationLog({
+            guild_id: interaction.guild.id,
+            user_id: targetUser.id,
+            moderator_id: interaction.user.id,
+            action_type: 'warn',
+            reason: reason,
+            timestamp: Date.now()
+          });
+          
           title = '⚠️ User Warned';
           description = `${targetUser.username} has been warned`;
           color = 0xFFA500;

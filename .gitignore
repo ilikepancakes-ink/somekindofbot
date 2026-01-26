@@ -8,3 +8,5 @@ bot/node_modules/.package-lock.json
 .idea/
 *.db
 bot/package-lock.json
+package-lock.json
+package.json

@@ -123,6 +123,18 @@ db.run(`CREATE TABLE IF NOT EXISTS better_embeds_messages (
   created_at INTEGER
 )`);
 
+// Moderation logs
+db.run(`CREATE TABLE IF NOT EXISTS moderation_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT,
+  user_id TEXT,
+  moderator_id TEXT,
+  action_type TEXT,
+  reason TEXT,
+  duration INTEGER,
+  timestamp INTEGER
+)`);
+
 interface GuildStats {
   guild_id: string;
   member_channel_id?: string;
@@ -197,6 +209,17 @@ interface BetterEmbedsMessage {
   platform: string;
   url: string;
   created_at: number;
+}
+
+interface ModerationLog {
+  id?: number;
+  guild_id: string;
+  user_id: string;
+  moderator_id: string;
+  action_type: string;
+  reason: string;
+  duration?: number;
+  timestamp: number;
 }
 
 function getGuildStats(guildId: string): Promise<GuildStats | undefined> {
@@ -504,6 +527,63 @@ function deleteBetterEmbedsMessage(originalMessageId: string): Promise<void> {
   });
 }
 
+// Moderation log functions
+function createModerationLog(log: ModerationLog): Promise<number> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO moderation_logs (guild_id, user_id, moderator_id, action_type, reason, duration, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [log.guild_id, log.user_id, log.moderator_id, log.action_type, log.reason, log.duration, log.timestamp],
+      function(this: any, err: any) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      }
+    );
+  });
+}
+
+function getModerationLogsByUser(userId: string, guildId: string): Promise<ModerationLog[]> {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM moderation_logs WHERE user_id = ? AND guild_id = ? ORDER BY timestamp DESC', [userId, guildId], (err: any, rows: any) => {
+      if (err) reject(err);
+      else resolve(rows as ModerationLog[]);
+    });
+  });
+}
+
+function getModerationLogsByGuild(guildId: string): Promise<ModerationLog[]> {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM moderation_logs WHERE guild_id = ? ORDER BY timestamp DESC', [guildId], (err: any, rows: any) => {
+      if (err) reject(err);
+      else resolve(rows as ModerationLog[]);
+    });
+  });
+}
+
+function getModerationSummaryByUser(userId: string, guildId: string): Promise<{ warns: number, timeouts: number, kicks: number, bans: number }> {
+  return new Promise((resolve, reject) => {
+    db.all(`
+      SELECT action_type, COUNT(*) as count 
+      FROM moderation_logs 
+      WHERE user_id = ? AND guild_id = ? 
+      GROUP BY action_type
+    `, [userId, guildId], (err: any, rows: any) => {
+      if (err) reject(err);
+      else {
+        const summary = { warns: 0, timeouts: 0, kicks: 0, bans: 0 };
+        rows.forEach((row: any) => {
+          switch (row.action_type) {
+            case 'warn': summary.warns = row.count; break;
+            case 'timeout': summary.timeouts = row.count; break;
+            case 'kick': summary.kicks = row.count; break;
+            case 'ban': summary.bans = row.count; break;
+          }
+        });
+        resolve(summary);
+      }
+    });
+  });
+}
+
 // EU please for the love of god dont burn my house down for collecting too much user data pweease i swear ill abide by the GDPR >.<
 export {
   getGuildStats,
@@ -534,4 +614,8 @@ export {
   createBetterEmbedsMessage,
   getBetterEmbedsMessageByOriginal,
   deleteBetterEmbedsMessage,
+  createModerationLog,
+  getModerationLogsByUser,
+  getModerationLogsByGuild,
+  getModerationSummaryByUser,
 };
