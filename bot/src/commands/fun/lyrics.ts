@@ -1,7 +1,7 @@
 import { CommandInteraction, EmbedBuilder, SlashCommandBuilder, CacheType, ChatInputCommandInteraction } from 'discord.js';
 import axios from 'axios';
 
-export default {
+module.exports = {
   data: new SlashCommandBuilder()
     .setName('lyrics')
     .setDescription('Fetch lyrics for a song')
