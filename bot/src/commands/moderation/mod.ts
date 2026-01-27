@@ -61,6 +61,14 @@ module.exports = {
           option.setName('reason')
             .setDescription('The reason for the warning')
             .setRequired(false)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('profile')
+        .setDescription('View a user\'s moderation profile')
+        .addUserOption(option =>
+          option.setName('user')
+            .setDescription('The user to view the profile for')
+            .setRequired(true)))
     .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
     .setContexts([InteractionContextType.Guild]),
 
