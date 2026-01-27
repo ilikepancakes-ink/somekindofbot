@@ -135,6 +135,18 @@ db.run(`CREATE TABLE IF NOT EXISTS moderation_logs (
   timestamp INTEGER
 )`);
 
+// Downloads
+db.run(`CREATE TABLE IF NOT EXISTS downloads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT,
+  video_url TEXT,
+  filename TEXT,
+  original_filename TEXT,
+  file_path TEXT,
+  created_at INTEGER,
+  expires_at INTEGER
+)`);
+
 interface GuildStats {
   guild_id: string;
   member_channel_id?: string;
@@ -584,6 +596,52 @@ function getModerationSummaryByUser(userId: string, guildId: string): Promise<{ 
   });
 }
 
+// Download functions
+async function createDownloadRecord(record: any): Promise<number> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO downloads (user_id, video_url, filename, original_filename, file_path, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [record.user_id, record.video_url, record.filename, record.original_filename, record.file_path, record.created_at, record.expires_at],
+      function(this: any, err: any) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      }
+    );
+  });
+}
+
+async function getDownloadRecord(filename: string): Promise<any | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM downloads WHERE filename = ?', [filename], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+async function cleanupExpiredDownloads(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM downloads WHERE expires_at < ?', [Date.now()], (err: any, rows: any) => {
+      if (err) reject(err);
+      else {
+        rows.forEach((row: any) => {
+          try {
+            if (require('fs').existsSync(row.file_path)) {
+              require('fs').unlinkSync(row.file_path);
+            }
+          } catch (e) {
+            console.error('Error deleting expired file:', e);
+          }
+        });
+        db.run('DELETE FROM downloads WHERE expires_at < ?', [Date.now()], (err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      }
+    });
+  });
+}
+
 // EU please for the love of god dont burn my house down for collecting too much user data pweease i swear ill abide by the GDPR >.<
 export {
   getGuildStats,
@@ -618,4 +676,7 @@ export {
   getModerationLogsByUser,
   getModerationLogsByGuild,
   getModerationSummaryByUser,
+  createDownloadRecord,
+  getDownloadRecord,
+  cleanupExpiredDownloads,
 };

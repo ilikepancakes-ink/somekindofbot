@@ -140,6 +140,60 @@ app.get('/callback', async (req, res) => {
   }
 });
 
+// Download endpoint
+app.get('/bot/features/download/command/:filename', async (req, res) => {
+  const filename = req.params.filename;
+
+  try {
+    // Get download record from database
+    const db = require('../bot/dist/database');
+    const downloadRecord = await db.getDownloadRecord(filename);
+
+    if (!downloadRecord) {
+      return res.status(404).send('Download not found or expired.');
+    }
+
+    // Check if file exists
+    const fs = require('fs');
+    if (!fs.existsSync(downloadRecord.file_path)) {
+      return res.status(404).send('File not found.');
+    }
+
+    // Check if download has expired
+    if (downloadRecord.expires_at < Date.now()) {
+      // Clean up expired file
+      try {
+        fs.unlinkSync(downloadRecord.file_path);
+        await db.cleanupExpiredDownloads();
+      } catch (e) {
+        console.error('Error cleaning up expired file:', e);
+      }
+      return res.status(410).send('Download link has expired.');
+    }
+
+    // Serve the file
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadRecord.original_filename}${path.extname(filename)}"`);
+    res.setHeader('Content-Type', downloadRecord.filename.endsWith('.mp3') ? 'audio/mpeg' : 'video/mp4');
+    
+    const fileStream = fs.createReadStream(downloadRecord.file_path);
+    fileStream.pipe(res);
+
+    // Optional: Clean up file after download (comment out if you want to keep files longer)
+    fileStream.on('end', () => {
+      try {
+        fs.unlinkSync(downloadRecord.file_path);
+        console.log(`Cleaned up file: ${downloadRecord.filename}`);
+      } catch (e) {
+        console.error('Error cleaning up file after download:', e);
+      }
+    });
+
+  } catch (error) {
+    console.error('Error serving download:', error);
+    res.status(500).send('Internal server error.');
+  }
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Website server running on port ${port}`);
