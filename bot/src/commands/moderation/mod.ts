@@ -64,7 +64,7 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('profile')
-        .setDescription('View a user\'s moderation profile')
+        .setDescription('View a user\'s moderation profile and check blacklist status')
         .addUserOption(option =>
           option.setName('user')
             .setDescription('The user to view the profile for')
@@ -81,6 +81,15 @@ module.exports = {
     const targetUser = interaction.options.getUser('target');
     const targetMember = interaction.options.getMember('target');
     const reason = interaction.options.getString('reason') || 'No reason provided';
+
+    // Fetch the blacklist data
+    let blacklistData: string[] = [];
+    try {
+      const response = await axios.get('https://raw.githubusercontent.com/RuyokiVenyl/Ro-Cleaner-Reborn/refs/heads/main/List%20Of%20Suspicious%20Servers/user_ids.txt');
+      blacklistData = response.data.split('\n').map((id: string) => id.trim()).filter((id: string) => id);
+    } catch (error) {
+      console.error('Error fetching blacklist data:', error);
+    }
 
     // Check permissions
     const member = interaction.member;
@@ -120,7 +129,7 @@ module.exports = {
       switch (subcommand) {
         case 'ban':
           await interaction.guild.members.ban(targetUser, { reason });
-          
+
           // Log the moderation action
           await createModerationLog({
             guild_id: interaction.guild.id,
@@ -130,7 +139,7 @@ module.exports = {
             reason: reason,
             timestamp: Date.now()
           });
-          
+
           title = '🔨 User Banned';
           description = `${targetUser.username} has been banned from the server`;
           color = 0xFF0000;
@@ -147,7 +156,7 @@ module.exports = {
             return await interaction.reply({ content: 'User not found in this server.', flags: 64 });
           }
           await targetMember.kick(reason);
-          
+
           // Log the moderation action
           await createModerationLog({
             guild_id: interaction.guild.id,
@@ -157,7 +166,7 @@ module.exports = {
             reason: reason,
             timestamp: Date.now()
           });
-          
+
           title = '👢 User Kicked';
           description = `${targetMember.user.username} has been kicked from the server`;
           color = 0xFFA500;
@@ -175,7 +184,7 @@ module.exports = {
           }
           const duration = interaction.options.getInteger('duration');
           await targetMember.timeout(duration * 60 * 1000, reason);
-          
+
           // Log the moderation action
           await createModerationLog({
             guild_id: interaction.guild.id,
@@ -186,7 +195,7 @@ module.exports = {
             duration: duration,
             timestamp: Date.now()
           });
-          
+
           const endTime = new Date(Date.now() + duration * 60 * 1000);
           const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false });
           title = '⏰ User Timed Out';
@@ -212,7 +221,7 @@ module.exports = {
             reason: reason,
             timestamp: Date.now()
           });
-          
+
           title = '⚠️ User Warned';
           description = `${targetUser.username} has been warned`;
           color = 0xFFA500;
@@ -226,6 +235,22 @@ module.exports = {
 
         default:
           return await interaction.reply({ content: 'Unknown subcommand.', flags: 64 });
+      }
+
+      // Add blacklist check to profile embed
+      if (subcommand === 'profile') {
+        const userToCheck = interaction.options.getUser('user');
+        const isBlacklisted = blacklistData.includes(userToCheck.id);
+
+        if (isBlacklisted) {
+          embed.addFields(
+            { name: 'Blacklist Status', value: '⚠️ BLACKLISTED - User is on the RoCleaner blacklist! This means they were/are in a roblox sexual roleplay server.', inline: false }
+          );
+        } else {
+          embed.addFields(
+            { name: 'Blacklist Status', value: '✅ CLEAR - User is not on any blacklist.', inline: false }
+          );
+        }
       }
 
       embed.setTitle(title)
