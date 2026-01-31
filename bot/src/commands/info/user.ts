@@ -3,7 +3,7 @@ import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRo
 const BOT_ADMIN_USER_ID = process.env.BOT_ADMIN_USER_ID;
 
 const developerBadges: { [key: string]: string } = {
-  [BOT_ADMIN_USER_ID || '']: '🛡️ OpenGuard Developer',
+  [BOT_ADMIN_USER_ID || '']: 'webmaster :3',
 };
 
 const truncateFieldValue = (text: string, maxLength: number = 1020): string => {
@@ -67,49 +67,62 @@ module.exports = {
       // Ignore errors
     }
 
-    let status = 'Unknown';
-    let deviceStr = 'Unknown';
-    let activityStr = 'None';
+let status = 'offline';
+  let deviceStr = 'Unknown';
+  let activityStr = 'None';
 
-    if (member) {
-      status = member.presence?.status || 'offline';
-      if (status === 'online') {
-        if (member.presence?.clientStatus?.desktop) deviceStr = 'Desktop';
-        else if (member.presence?.clientStatus?.mobile) deviceStr = 'Mobile';
-        else if (member.presence?.clientStatus?.web) deviceStr = 'Website';
-      }
+  if (member && member.presence) {
+    status = member.presence.status || 'offline';
+    if (status === 'online' && member.presence.clientStatus) {
+      if (member.presence.clientStatus.desktop) deviceStr = 'Desktop';
+      else if (member.presence.clientStatus.mobile) deviceStr = 'Mobile';
+      else if (member.presence.clientStatus.web) deviceStr = 'Website';
+    }
 
-      if (member.presence?.activities && member.presence.activities.length > 0) {
-        const activity = member.presence.activities[0];
-        if (activity.type === 0) { // Playing
+    if (member.presence.activities && member.presence.activities.length > 0) {
+      const activity = member.presence.activities[0];
+      switch (activity.type) {
+        case 0: // Playing
           activityStr = `Playing ${activity.name}`;
-        } else if (activity.type === 1) { // Streaming
+          break;
+        case 1: // Streaming
           activityStr = `Streaming on ${activity.platform}`;
-        } else if (activity.type === 4) { // Custom
-          activityStr = activity.emoji ? `${activity.emoji} ${activity.state || activity.name}` : (activity.state || activity.name);
-        } else if (activity.type === 2) { // Listening
+          break;
+        case 2: // Listening
           if (activity.name === 'Spotify') {
             activityStr = `Listening to ${activity.details} by ${activity.state}`;
           } else {
             activityStr = `Listening to ${activity.name}`;
           }
-        }
+          break;
+        case 3: // Watching
+          activityStr = `Watching ${activity.name}`;
+          break;
+        case 4: // Custom
+          activityStr = activity.emoji ? `${activity.emoji} ${activity.state || activity.name}` : (activity.state || activity.name);
+          break;
+        case 5: // Competing
+          activityStr = `Competing in ${activity.name}`;
+          break;
+        default:
+          activityStr = activity.name || 'Unknown activity';
       }
     }
+  }
 
     activityStr = truncateFieldValue(activityStr);
 
-    let rolesStr = 'None';
-    if (member && member.roles.cache.size > 0) {
-      const roles = member.roles.cache
-        .filter((role: any) => role.name !== '@everyone')
-        .sort((a: any, b: any) => b.position - a.position)
-        .map((role: any) => role.toString());
-      if (roles.length > 0) {
-        rolesStr = roles.join(', ');
-        rolesStr = truncateFieldValue(rolesStr);
-      }
+let rolesStr = 'None';
+  if (member && member.roles.cache.size > 1) {
+    const roles = member.roles.cache
+      .filter((role: any) => role.name !== '@everyone')
+      .sort((a: any, b: any) => b.position - a.position)
+      .map((role: any) => role.toString());
+    if (roles.length > 0) {
+      rolesStr = roles.join(', ');
+      rolesStr = truncateFieldValue(rolesStr);
     }
+  }
 
     const badgeMap: { [key: string]: string } = {
       Staff: '🛡️ Discord Staff',
@@ -144,13 +157,13 @@ module.exports = {
 
     const badgeStr = badges.join(', ');
 
-    const embed = new EmbedBuilder()
+const embed = new EmbedBuilder()
       .setTitle(`User Info: ${member?.displayName || targetUser.displayName}`)
       .setDescription(`Profile of ${targetUser}`)
       .setColor(member?.displayHexColor || 0x0099ff)
       .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }));
 
-    if (bannerUrl) {
+if (bannerUrl) {
       embed.setImage(bannerUrl);
     }
 
@@ -183,14 +196,5 @@ module.exports = {
       iconURL: interaction.user.displayAvatarURL({ dynamic: true })
     });
 
-    const viewButton = new ButtonBuilder()
-      .setCustomId(`user_permissions_${targetUser.id}`)
-      .setLabel('View Permissions')
-      .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder<ButtonBuilder>()
-      .addComponents(viewButton);
-
-    await interaction.reply({ embeds: [embed], components: [row] });
   },
 };
