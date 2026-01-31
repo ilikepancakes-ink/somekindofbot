@@ -3,6 +3,43 @@ import axios from 'axios';
 import * as path from 'path';
 const { getGuildStats, createModerationLog } = require(path.join(__dirname, '../../database'));
 
+// Helper functions from user.ts
+const truncateFieldValue = (text: string, maxLength: number = 1020): string => {
+  if (text.length > maxLength) {
+    return text.slice(0, maxLength - 3) + '...';
+  }
+  return text;
+};
+
+const formatTimeDifference = (pastTime: Date): string => {
+  const now = new Date();
+  const diffMs = now.getTime() - pastTime.getTime();
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+
+  const years = Math.floor(totalMinutes / (365 * 24 * 60));
+  let remainingMinutes = totalMinutes % (365 * 24 * 60);
+
+  const days = Math.floor(remainingMinutes / (24 * 60));
+  remainingMinutes = remainingMinutes % (24 * 60);
+
+  const hours = Math.floor(remainingMinutes / 60);
+  const minutes = remainingMinutes % 60;
+
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} year${years !== 1 ? 's' : ''}`);
+  if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`);
+  if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+  if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+
+  if (parts.length === 0) return 'Less than a minute';
+
+  return parts.join(', ');
+};
+
+const developerBadges: { [key: string]: string } = {
+  'BOT_ADMIN_USER_ID': 'webmaster :3',
+};
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('mod')
@@ -64,7 +101,7 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('profile')
-        .setDescription('View a user\'s moderation profile and check blacklist status')
+        .setDescription('View comprehensive user information and check blacklist status')
         .addUserOption(option =>
           option.setName('user')
             .setDescription('The user to view the profile for')
@@ -116,15 +153,6 @@ module.exports = {
         break;
     }
 
-    const embed = new EmbedBuilder()
-      .setTimestamp()
-      .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) });
-
-    let title: string;
-    let description: string;
-    let color: number;
-    let thumbnail: string;
-
     try {
       switch (subcommand) {
         case 'ban':
@@ -140,15 +168,31 @@ module.exports = {
             timestamp: Date.now()
           });
 
-          title = '🔨 User Banned';
-          description = `${targetUser.username} has been banned from the server`;
-          color = 0xFF0000;
-          thumbnail = targetUser.displayAvatarURL({ dynamic: true });
-          embed.addFields(
-            { name: 'User', value: `${targetUser}`, inline: true },
-            { name: 'User ID', value: targetUser.id, inline: true },
-            { name: 'Reason', value: reason, inline: false }
-          );
+          const banEmbed = new EmbedBuilder()
+            .setTimestamp()
+            .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+            .setTitle('🔨 User Banned')
+            .setDescription(`${targetUser.username} has been banned from the server`)
+            .setColor(0xFF0000)
+            .addFields(
+              { name: 'User', value: `${targetUser}`, inline: true },
+              { name: 'User ID', value: targetUser.id, inline: true },
+              { name: 'Reason', value: reason, inline: false }
+            );
+
+          await interaction.reply({ embeds: [banEmbed] });
+
+          // Send log to webhook
+          const stats = await getGuildStats(interaction.guild.id);
+          if (stats && stats.log_webhook_url) {
+            try {
+              await axios.post(stats.log_webhook_url, {
+                embeds: [banEmbed.toJSON()]
+              });
+            } catch (logError) {
+              console.error('Error sending log to webhook:', logError);
+            }
+          }
           break;
 
         case 'kick':
@@ -167,15 +211,31 @@ module.exports = {
             timestamp: Date.now()
           });
 
-          title = '👢 User Kicked';
-          description = `${targetMember.user.username} has been kicked from the server`;
-          color = 0xFFA500;
-          thumbnail = targetMember.user.displayAvatarURL({ dynamic: true });
-          embed.addFields(
-            { name: 'User', value: `${targetMember.user}`, inline: true },
-            { name: 'User ID', value: targetMember.user.id, inline: true },
-            { name: 'Reason', value: reason, inline: false }
-          );
+          const kickEmbed = new EmbedBuilder()
+            .setTimestamp()
+            .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+            .setTitle('👢 User Kicked')
+            .setDescription(`${targetMember.user.username} has been kicked from the server`)
+            .setColor(0xFFA500)
+            .addFields(
+              { name: 'User', value: `${targetMember.user}`, inline: true },
+              { name: 'User ID', value: targetMember.user.id, inline: true },
+              { name: 'Reason', value: reason, inline: false }
+            );
+
+          await interaction.reply({ embeds: [kickEmbed] });
+
+          // Send log to webhook
+          const kickStats = await getGuildStats(interaction.guild.id);
+          if (kickStats && kickStats.log_webhook_url) {
+            try {
+              await axios.post(kickStats.log_webhook_url, {
+                embeds: [kickEmbed.toJSON()]
+              });
+            } catch (logError) {
+              console.error('Error sending log to webhook:', logError);
+            }
+          }
           break;
 
         case 'timeout':
@@ -198,17 +258,33 @@ module.exports = {
 
           const endTime = new Date(Date.now() + duration * 60 * 1000);
           const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false });
-          title = '⏰ User Timed Out';
-          description = `${targetMember.user.username} has been timed out until ${cetTime} CET`;
-          color = 0xFFFF00;
-          thumbnail = targetMember.user.displayAvatarURL({ dynamic: true });
-          embed.addFields(
-            { name: 'User', value: `${targetMember.user}`, inline: true },
-            { name: 'User ID', value: targetMember.user.id, inline: true },
-            { name: 'Duration', value: `${duration} minutes`, inline: true },
-            { name: 'Ends at', value: cetTime + ' CET', inline: true },
-            { name: 'Reason', value: reason, inline: false }
-          );
+          const timeoutEmbed = new EmbedBuilder()
+            .setTimestamp()
+            .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+            .setTitle('⏰ User Timed Out')
+            .setDescription(`${targetMember.user.username} has been timed out until ${cetTime} CET`)
+            .setColor(0xFFFF00)
+            .addFields(
+              { name: 'User', value: `${targetMember.user}`, inline: true },
+              { name: 'User ID', value: targetMember.user.id, inline: true },
+              { name: 'Duration', value: `${duration} minutes`, inline: true },
+              { name: 'Ends at', value: cetTime + ' CET', inline: true },
+              { name: 'Reason', value: reason, inline: false }
+            );
+
+          await interaction.reply({ embeds: [timeoutEmbed] });
+
+          // Send log to webhook
+          const timeoutStats = await getGuildStats(interaction.guild.id);
+          if (timeoutStats && timeoutStats.log_webhook_url) {
+            try {
+              await axios.post(timeoutStats.log_webhook_url, {
+                embeds: [timeoutEmbed.toJSON()]
+              });
+            } catch (logError) {
+              console.error('Error sending log to webhook:', logError);
+            }
+          }
           break;
 
         case 'warn':
@@ -222,63 +298,195 @@ module.exports = {
             timestamp: Date.now()
           });
 
-          title = '⚠️ User Warned';
-          description = `${targetUser.username} has been warned`;
-          color = 0xFFA500;
-          thumbnail = targetUser.displayAvatarURL({ dynamic: true });
-          embed.addFields(
-            { name: 'User', value: `${targetUser}`, inline: true },
-            { name: 'User ID', value: targetUser.id, inline: true },
-            { name: 'Reason', value: reason, inline: false }
+          const warnEmbed = new EmbedBuilder()
+            .setTimestamp()
+            .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+            .setTitle('⚠️ User Warned')
+            .setDescription(`${targetUser.username} has been warned`)
+            .setColor(0xFFA500)
+            .addFields(
+              { name: 'User', value: `${targetUser}`, inline: true },
+              { name: 'User ID', value: targetUser.id, inline: true },
+              { name: 'Reason', value: reason, inline: false }
+            );
+
+          await interaction.reply({ embeds: [warnEmbed] });
+
+          // Send log to webhook
+          const warnStats = await getGuildStats(interaction.guild.id);
+          if (warnStats && warnStats.log_webhook_url) {
+            try {
+              await axios.post(warnStats.log_webhook_url, {
+                embeds: [warnEmbed.toJSON()]
+              });
+            } catch (logError) {
+              console.error('Error sending log to webhook:', logError);
+            }
+          }
+          break;
+
+        case 'profile':
+          // Get user information
+          const userOption = interaction.options.getUser('user');
+          const profileUser = userOption || interaction.user;
+          const profileMember = interaction.guild?.members.cache.get(profileUser.id);
+
+          let bannerUrl: string | null = null;
+          try {
+            const fetchedUser = await interaction.client.users.fetch(profileUser.id);
+            if (fetchedUser.banner) {
+              bannerUrl = fetchedUser.bannerURL({ size: 1024 });
+            }
+          } catch (error) {
+            // Ignore errors
+          }
+
+          let status = 'offline';
+          let deviceStr = 'Unknown';
+          let activityStr = 'None';
+
+          if (profileMember && profileMember.presence) {
+            status = profileMember.presence.status || 'offline';
+            if (status === 'online' && profileMember.presence.clientStatus) {
+              if (profileMember.presence.clientStatus.desktop) deviceStr = 'Desktop';
+              else if (profileMember.presence.clientStatus.mobile) deviceStr = 'Mobile';
+              else if (profileMember.presence.clientStatus.web) deviceStr = 'Website';
+            }
+
+            if (profileMember.presence.activities && profileMember.presence.activities.length > 0) {
+              const activity = profileMember.presence.activities[0];
+              switch (activity.type) {
+                case 0: // Playing
+                  activityStr = `Playing ${activity.name}`;
+                  break;
+                case 1: // Streaming
+                  activityStr = `Streaming on ${activity.platform}`;
+                  break;
+                case 2: // Listening
+                  if (activity.name === 'Spotify') {
+                    activityStr = `Listening to ${activity.details} by ${activity.state}`;
+                  } else {
+                    activityStr = `Listening to ${activity.name}`;
+                  }
+                  break;
+                case 3: // Watching
+                  activityStr = `Watching ${activity.name}`;
+                  break;
+                case 4: // Custom
+                  activityStr = activity.emoji ? `${activity.emoji} ${activity.state || activity.name}` : (activity.state || activity.name);
+                  break;
+                case 5: // Competing
+                  activityStr = `Competing in ${activity.name}`;
+                  break;
+                default:
+                  activityStr = activity.name || 'Unknown activity';
+              }
+            }
+          }
+
+          activityStr = truncateFieldValue(activityStr);
+
+          let rolesStr = 'None';
+          if (profileMember && profileMember.roles.cache.size > 1) {
+            const roles = profileMember.roles.cache
+              .filter((role: any) => role.name !== '@everyone')
+              .sort((a: any, b: any) => b.position - a.position)
+              .map((role: any) => role.toString());
+            if (roles.length > 0) {
+              rolesStr = roles.join(', ');
+              rolesStr = truncateFieldValue(rolesStr);
+            }
+          }
+
+          const badgeMap: { [key: string]: string } = {
+            Staff: '🛡️ Discord Staff',
+            Partner: '⭐ Partner',
+            Hypesquad: '🏆 HypeSquad Event',
+            BugHunterLevel1: '🐛 Bug Hunter',
+            HypeSquadOnlineHouse1: '🦁 Bravery',
+            HypeSquadOnlineHouse2: '🧠 Brilliance',
+            HypeSquadOnlineHouse3: '⚖️ Balance',
+            EarlySupporter: '🕰️ Early Supporter',
+            TeamPseudoUser: '👥 Team User',
+            BugHunterLevel2: '🐞 Bug Hunter Level 2',
+            VerifiedBot: '🤖 Verified Bot',
+            EarlyVerifiedBotDeveloper: '🛠️ Early Verified Bot Dev',
+            DiscordCertifiedModerator: '🛡️ Certified Mod',
+            ActiveDeveloper: '🧑‍💻 Active Developer',
+          };
+
+          const badges: string[] = [];
+          if (profileUser.flags) {
+            for (const [flag, emoji] of Object.entries(badgeMap)) {
+              if ((profileUser.flags as any)[flag]) {
+                badges.push(emoji);
+              }
+            }
+          }
+
+          const developerBadge = developerBadges[profileUser.id];
+          if (developerBadge) {
+            badges.push(developerBadge);
+          }
+
+          const badgeStr = badges.join(', ');
+
+          const profileEmbed = new EmbedBuilder()
+            .setTitle(`User Info: ${profileMember?.displayName || profileUser.displayName}`)
+            .setDescription(`Profile of ${profileUser}`)
+            .setColor(profileMember?.displayHexColor || 0x0099ff)
+            .setThumbnail(profileUser.displayAvatarURL({ dynamic: true }));
+
+          if (bannerUrl) {
+            profileEmbed.setImage(bannerUrl);
+          }
+
+          if (badgeStr) {
+            profileEmbed.addFields({ name: 'Badges', value: badgeStr, inline: false });
+          }
+
+          profileEmbed.addFields(
+            { name: 'Nickname', value: profileMember?.nickname || 'None', inline: true },
+            { name: 'Username', value: profileUser.username, inline: true },
+            { name: 'User ID', value: profileUser.id, inline: true },
+            { name: 'Status', value: status.charAt(0).toUpperCase() + status.slice(1), inline: true },
+            { name: 'Device', value: deviceStr, inline: true },
+            { name: 'Activity', value: activityStr, inline: true },
+            { name: 'Roles', value: rolesStr, inline: false }
           );
+
+          const accountAge = formatTimeDifference(profileUser.createdAt);
+          const accountCreatedText = `${profileUser.createdAt.toISOString().slice(0, 19).replace('T', ' ')} UTC\n(${accountAge} ago)`;
+          profileEmbed.addFields({ name: 'Account Created', value: accountCreatedText, inline: true });
+
+          if (profileMember?.joinedAt) {
+            const serverJoinAge = formatTimeDifference(profileMember.joinedAt);
+            const joinedServerText = `${profileMember.joinedAt.toISOString().slice(0, 19).replace('T', ' ')} UTC\n(${serverJoinAge} ago)`;
+            profileEmbed.addFields({ name: 'Joined Server', value: joinedServerText, inline: true });
+          }
+
+          // Add blacklist check
+          const isBlacklisted = blacklistData.includes(profileUser.id);
+          if (isBlacklisted) {
+            profileEmbed.addFields(
+              { name: 'Blacklist Status', value: '⚠️ BLACKLISTED - User is on the RoCleaner blacklist! This means they were/are in a roblox sexual roleplay server.', inline: false }
+            );
+          } else {
+            profileEmbed.addFields(
+              { name: 'Blacklist Status', value: '✅ CLEAR - User is not on any blacklist.', inline: false }
+            );
+          }
+
+          profileEmbed.setFooter({
+            text: `Requested by ${interaction.user.username}`,
+            iconURL: interaction.user.displayAvatarURL({ dynamic: true })
+          });
+
+          await interaction.reply({ embeds: [profileEmbed] });
           break;
 
         default:
           return await interaction.reply({ content: 'Unknown subcommand.', flags: 64 });
-      }
-
-      // Add blacklist check to profile embed
-      if (subcommand === 'profile') {
-        const userToCheck = interaction.options.getUser('user');
-        const isBlacklisted = blacklistData.includes(userToCheck.id);
-
-        if (isBlacklisted) {
-          embed.addFields(
-            { name: 'Blacklist Status', value: '⚠️ BLACKLISTED - User is on the RoCleaner blacklist! This means they were/are in a roblox sexual roleplay server.', inline: false }
-          );
-        } else {
-          embed.addFields(
-            { name: 'Blacklist Status', value: '✅ CLEAR - User is not on any blacklist.', inline: false }
-          );
-        }
-      }
-
-      embed.setTitle(title)
-        .setDescription(description)
-        .setColor(color)
-        .setThumbnail(thumbnail);
-
-      await interaction.reply({ embeds: [embed] });
-
-      // Send log to webhook
-      const stats = await getGuildStats(interaction.guild.id);
-      if (stats && stats.log_webhook_url) {
-        const logEmbed = new EmbedBuilder()
-          .setTitle(title)
-          .setDescription(description.replace('has been', 'was'))
-          .addFields(embed.data.fields!)
-          .setColor(color)
-          .setThumbnail(thumbnail)
-          .setTimestamp()
-          .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) });
-
-        try {
-          await axios.post(stats.log_webhook_url, {
-            embeds: [logEmbed.toJSON()]
-          });
-        } catch (logError) {
-          console.error('Error sending log to webhook:', logError);
-        }
       }
     } catch (error) {
       console.error(error);
