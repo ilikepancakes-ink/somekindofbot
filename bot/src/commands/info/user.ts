@@ -67,7 +67,7 @@ module.exports = {
       // Ignore errors
     }
 
-    let status = 'Unknown';
+    let status = 'Offline';
     let deviceStr = 'Unknown';
     let activityStr = 'None';
 
