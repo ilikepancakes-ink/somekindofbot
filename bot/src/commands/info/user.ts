@@ -3,7 +3,7 @@ import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRo
 const BOT_ADMIN_USER_ID = process.env.BOT_ADMIN_USER_ID;
 
 const developerBadges: { [key: string]: string } = {
-  [BOT_ADMIN_USER_ID || '']: '🛡️ OpenGuard Developer',
+  [BOT_ADMIN_USER_ID || '']: 'webmaster :3',
 };
 
 const truncateFieldValue = (text: string, maxLength: number = 1020): string => {
@@ -67,20 +67,35 @@ module.exports = {
       // Ignore errors
     }
 
-    let status = 'Offline';
-    let deviceStr = 'Unknown';
-    let activityStr = 'None';
+    let status: string | null = null;
+    let deviceStr: string | null = null;
+    let activityStr: string | null = null;
 
     if (member) {
-      status = member.presence?.status || 'offline';
+      const presence = member.presence;
+      status = presence?.status || null;
+      
       if (status === 'online') {
-        if (member.presence?.clientStatus?.desktop) deviceStr = 'Desktop';
-        else if (member.presence?.clientStatus?.mobile) deviceStr = 'Mobile';
-        else if (member.presence?.clientStatus?.web) deviceStr = 'Website';
+        if (presence?.clientStatus?.desktop) {
+          deviceStr = 'Desktop';
+        } else if (presence?.clientStatus?.mobile) {
+          deviceStr = 'Mobile';
+        } else if (presence?.clientStatus?.web) {
+          deviceStr = 'Website';
+        } else {
+          deviceStr = 'Unknown (no client status detected)';
+        }
+      } else if (status === 'offline') {
+        deviceStr = 'Unknown (user is offline)';
+      } else if (status) {
+        deviceStr = `Unknown (${status})`;
+      } else {
+        deviceStr = 'Unknown (no status detected)';
       }
 
-      if (member.presence?.activities && member.presence.activities.length > 0) {
-        const activity = member.presence.activities[0];
+      if (presence?.activities && presence.activities.length > 0) {
+        const activity = presence.activities[0];
+        
         if (activity.type === 0) { // Playing
           activityStr = `Playing ${activity.name}`;
         } else if (activity.type === 1) { // Streaming
@@ -93,11 +108,18 @@ module.exports = {
           } else {
             activityStr = `Listening to ${activity.name}`;
           }
+        } else {
+          activityStr = `Activity (${activity.type}): ${activity.name}`;
         }
+      } else {
+        activityStr = 'None (no activities detected)';
       }
+    } else {
+      deviceStr = 'Unknown (no member object)';
+      activityStr = 'None (no member object)';
     }
 
-    activityStr = truncateFieldValue(activityStr);
+    activityStr = truncateFieldValue(activityStr || '');
 
     let rolesStr = 'None';
     if (member && member.roles.cache.size > 0) {
@@ -119,19 +141,18 @@ module.exports = {
       HypeSquadOnlineHouse1: '🦁 Bravery',
       HypeSquadOnlineHouse2: '🧠 Brilliance',
       HypeSquadOnlineHouse3: '⚖️ Balance',
-      EarlySupporter: '🕰️ Early Supporter',
+      PremiumEarlySupporter: '🕰️ Early Supporter',
       TeamPseudoUser: '👥 Team User',
       BugHunterLevel2: '🐞 Bug Hunter Level 2',
       VerifiedBot: '🤖 Verified Bot',
-      EarlyVerifiedBotDeveloper: '🛠️ Early Verified Bot Dev',
-      DiscordCertifiedModerator: '🛡️ Certified Mod',
-      ActiveDeveloper: '🧑‍💻 Active Developer',
+      VerifiedDeveloper: '🛠️ Early Verified Bot Dev',
+      CertifiedModerator: '🛡️ Certified Mod',
     };
 
     const badges: string[] = [];
     if (targetUser.flags) {
       for (const [flag, emoji] of Object.entries(badgeMap)) {
-        if ((targetUser.flags as any)[flag]) {
+        if (targetUser.flags?.has(flag as any)) {
           badges.push(emoji);
         }
       }
@@ -158,13 +179,29 @@ module.exports = {
       embed.addFields({ name: 'Badges', value: badgeStr, inline: false });
     }
 
+    // Count how many servers the user is in with the bot
+    let mutualServersCount = 0;
+    try {
+      const guilds = interaction.client.guilds.cache;
+      for (const [guildId, guild] of guilds) {
+        try {
+          const member = await guild.members.fetch(targetUser.id);
+          if (member) mutualServersCount++;
+        } catch (error) {
+          // User is not in this server, continue
+        }
+      }
+    } catch (error) {
+      // Ignore errors
+    }
+
     embed.addFields(
-      { name: 'Nickname', value: member?.nickname || 'None', inline: true },
       { name: 'Username', value: targetUser.username, inline: true },
       { name: 'User ID', value: targetUser.id, inline: true },
-      { name: 'Status', value: status.charAt(0).toUpperCase() + status.slice(1), inline: true },
+      { name: 'Status', value: status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown', inline: true },
       { name: 'Device', value: deviceStr, inline: true },
       { name: 'Activity', value: activityStr, inline: true },
+      { name: 'Mutual Servers with the bot', value: mutualServersCount.toString(), inline: true },
       { name: 'Roles', value: rolesStr, inline: false }
     );
 
@@ -191,6 +228,14 @@ module.exports = {
     const row = new ActionRowBuilder<ButtonBuilder>()
       .addComponents(viewButton);
 
-    await interaction.reply({ embeds: [embed], components: [row] });
+    try {
+      await interaction.reply({ embeds: [embed], components: [row] });
+    } catch (error: any) {
+      if (error.code === 10062) {
+        // Interaction expired, ignore
+        return;
+      }
+      throw error;
+    }
   },
 };
