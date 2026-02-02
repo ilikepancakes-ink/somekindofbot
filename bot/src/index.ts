@@ -3,7 +3,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { config } from 'dotenv';
 
-// Load environment variables FIRST
 config();
 
 import './server';
@@ -21,7 +20,6 @@ const client = new Client({
   ],
 });
 
-// Collection to store commands
 (client as any).commands = new Collection();
 
 async function loadCommands() {
@@ -29,10 +27,8 @@ async function loadCommands() {
   const commandsPath = path.join(__dirname, 'commands');
   const commandFolders = fs.readdirSync(commandsPath);
 
-  // Clear existing commands
   (client as any).commands.clear();
 
-  // Determine file extension based on current file (ts for dev, js for built)
   const fileExtension = __filename.endsWith('.ts') ? '.ts' : '.js';
 
   for (const folder of commandFolders) {
@@ -42,13 +38,11 @@ async function loadCommands() {
     for (const file of commandFiles) {
       const filePath = path.join(folderPath, file);
 
-      // Clear require cache to reload the module
       delete require.cache[require.resolve(filePath)];
 
       const command = require(filePath);
 
       if (command.data && command.execute) {
-        // Store the group (folder name) with the command
         command.group = folder;
         (client as any).commands.set(command.data.name, command);
         commands.push(command.data.toJSON());
@@ -58,7 +52,6 @@ async function loadCommands() {
     }
   }
 
-  // Register commands with Discord
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!);
 
   console.log(`Started refreshing ${commands.length} application (/) commands.`);
@@ -75,10 +68,7 @@ async function main() {
   try {
     await loadCommands();
 
-    // Determine file extension based on current file (ts for dev, js for built)
     const fileExtension = __filename.endsWith('.ts') ? '.ts' : '.js';
-
-    // Load events
     const eventsPath = path.join(__dirname, 'events');
     const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith(fileExtension));
 
@@ -103,5 +93,4 @@ async function main() {
 
 main();
 
-// Export for external use (e.g., in update command)
 export { client, loadCommands };
