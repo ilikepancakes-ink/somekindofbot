@@ -100,26 +100,6 @@ module.exports = {
             .setRequired(false)))
     .addSubcommandGroup(subcommandGroup =>
       subcommandGroup
-        .setName('channel')
-        .setDescription('Channel management commands')
-        .addSubcommand(subcommand =>
-          subcommand
-            .setName('add')
-            .setDescription('Add a channel')
-            .addChannelOption(option =>
-              option.setName('channel')
-                .setDescription('The channel to add')
-                .setRequired(true)))
-        .addSubcommand(subcommand =>
-          subcommand
-            .setName('delete')
-            .setDescription('Delete a channel')
-            .addChannelOption(option =>
-              option.setName('channel')
-                .setDescription('The channel to delete')
-                .setRequired(true))))
-    .addSubcommandGroup(subcommandGroup =>
-      subcommandGroup
         .setName('category')
         .setDescription('Category management commands')
         .addSubcommand(subcommand =>
@@ -366,70 +346,6 @@ module.exports = {
           }
           break;
 
-        case 'channel':
-          const channelSubcommand = interaction.options.getSubcommand();
-          const channel = interaction.options.getChannel('channel');
-          
-          if (channelSubcommand === 'add') {
-            // Check if user has Manage Channels permission
-            if (!interaction.member.permissions.has('ManageChannels')) {
-              return await interaction.reply({ content: 'You need Manage Channels permission to use this command.', flags: 64 });
-            }
-            
-            // Create the channel
-            const newChannel = await interaction.guild.channels.create({
-              name: channel.name,
-              type: channel.type,
-              parent: channel.parent,
-              topic: channel.topic,
-              nsfw: channel.nsfw,
-              bitrate: channel.bitrate,
-              userLimit: channel.userLimit,
-              permissionOverwrites: channel.permissionOverwrites.cache.map((overwrite: any) => ({
-                id: overwrite.id,
-                type: overwrite.type,
-                allow: overwrite.allow,
-                deny: overwrite.deny
-              }))
-            });
-
-            const channelAddEmbed = new EmbedBuilder()
-              .setTimestamp()
-              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-              .setTitle('➕ Channel Added')
-              .setDescription(`Channel ${newChannel} has been created`)
-              .setColor(0x00FF00)
-              .addFields(
-                { name: 'Channel', value: `${newChannel}`, inline: true },
-                { name: 'Channel ID', value: newChannel.id, inline: true },
-                { name: 'Type', value: newChannel.type, inline: true }
-              );
-
-            await interaction.reply({ embeds: [channelAddEmbed] });
-          } else if (channelSubcommand === 'delete') {
-            // Check if user has Manage Channels permission
-            if (!interaction.member.permissions.has('ManageChannels')) {
-              return await interaction.reply({ content: 'You need Manage Channels permission to use this command.', flags: 64 });
-            }
-            
-            // Delete the channel
-            await channel.delete();
-
-            const channelDeleteEmbed = new EmbedBuilder()
-              .setTimestamp()
-              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-              .setTitle('🗑️ Channel Deleted')
-              .setDescription(`Channel ${channel.name} has been deleted`)
-              .setColor(0xFF0000)
-              .addFields(
-                { name: 'Channel', value: `${channel.name}`, inline: true },
-                { name: 'Channel ID', value: channel.id, inline: true },
-                { name: 'Type', value: channel.type, inline: true }
-              );
-
-            await interaction.reply({ embeds: [channelDeleteEmbed] });
-          }
-          break;
 
         case 'category':
           const categorySubcommand = interaction.options.getSubcommand();
