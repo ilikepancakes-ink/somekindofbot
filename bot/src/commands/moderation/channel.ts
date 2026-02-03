@@ -137,7 +137,7 @@ module.exports = {
           break;
 
         case 'category':
-          const categorySubcommand = interaction.options.getSubcommand();
+          const categorySubcommand = interaction.options.getSubcommand(true);
           
           if (categorySubcommand === 'add') {
             // Check if user has Manage Channels permission
