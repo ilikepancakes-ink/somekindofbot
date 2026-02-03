@@ -1,4 +1,6 @@
 import { SlashCommandBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, PermissionFlagsBits, InteractionContextType } from 'discord.js';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 const BOT_ADMIN_USER_ID = process.env.BOT_ADMIN_USER_ID;
 

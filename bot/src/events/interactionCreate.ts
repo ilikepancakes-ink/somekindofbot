@@ -1,6 +1,8 @@
 import { Events, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, PermissionFlagsBits, OverwriteType, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
 import { rule34Data } from '../commands/nsfw/rule34';
 import * as path from 'path';
+import * as dotenv from 'dotenv';
+dotenv.config();
 const { getTicketSettings, createTicket, getRoleEmbedByMessage } = require(path.join(__dirname, '../database'));
 const { nukeGuildXP } = require(path.join(__dirname, '../xpDatabase'));
 
@@ -15,8 +17,11 @@ module.exports = {
         return;
       }
 
+      // Check if user is bot admin
+      const isAdmin = process.env.BOT_ADMIN_USER_ID && interaction.user.id === process.env.BOT_ADMIN_USER_ID;
+
       try {
-        await command.execute(interaction);
+        await command.execute(interaction, isAdmin);
       } catch (error: any) {
         console.error(error);
         if (error.code === 10062) return; // Don't respond to expired interactions

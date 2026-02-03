@@ -1,4 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, InteractionContextType, ChannelType } from 'discord.js';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -63,8 +65,9 @@ module.exports = {
 
     const subcommand = interaction.options.getSubcommand();
     
-    // Check if user has Manage Channels permission
-    if (!interaction.member.permissions.has('ManageChannels')) {
+    // Check if user has Manage Channels permission or is bot admin
+    const isAdmin = process.env.BOT_ADMIN_USER_ID && interaction.user.id === process.env.BOT_ADMIN_USER_ID;
+    if (!isAdmin && !interaction.member.permissions.has('ManageChannels')) {
       return await interaction.reply({ content: 'You need Manage Channels permission to use this command.', flags: 64 });
     }
 
@@ -140,8 +143,9 @@ module.exports = {
           const categorySubcommand = interaction.options.getSubcommand(true);
           
           if (categorySubcommand === 'add') {
-            // Check if user has Manage Channels permission
-            if (!interaction.member.permissions.has('ManageChannels')) {
+            // Check if user has Manage Channels permission or is bot admin
+            const isAdmin = process.env.BOT_ADMIN_USER_ID && interaction.user.id === process.env.BOT_ADMIN_USER_ID;
+            if (!isAdmin && !interaction.member.permissions.has('ManageChannels')) {
               return await interaction.reply({ content: 'You need Manage Channels permission to use this command.', flags: 64 });
             }
             
@@ -166,8 +170,9 @@ module.exports = {
 
             await interaction.reply({ embeds: [categoryAddEmbed] });
           } else if (categorySubcommand === 'delete') {
-            // Check if user has Manage Channels permission
-            if (!interaction.member.permissions.has('ManageChannels')) {
+            // Check if user has Manage Channels permission or is bot admin
+            const isAdmin = process.env.BOT_ADMIN_USER_ID && interaction.user.id === process.env.BOT_ADMIN_USER_ID;
+            if (!isAdmin && !interaction.member.permissions.has('ManageChannels')) {
               return await interaction.reply({ content: 'You need Manage Channels permission to use this command.', flags: 64 });
             }
             

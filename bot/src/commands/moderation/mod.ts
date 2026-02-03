@@ -1,6 +1,8 @@
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, InteractionContextType, ChannelType } from 'discord.js';
 import axios from 'axios';
 import * as path from 'path';
+import * as dotenv from 'dotenv';
+dotenv.config();
 const { getGuildStats, createModerationLog } = require(path.join(__dirname, '../../database'));
 
 // Helper functions from user.ts
@@ -130,7 +132,7 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.KickMembers)
     .setContexts([InteractionContextType.Guild]),
 
-  async execute(interaction: any) {
+  async execute(interaction: any, isAdmin: boolean = false) {
     if (!interaction.guild) {
       return await interaction.reply({ content: 'This command can only be used in a server.', flags: 64 });
     }
@@ -155,20 +157,21 @@ module.exports = {
       return await interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
     }
 
+    // Check specific permissions for each subcommand
     switch (subcommand) {
       case 'ban':
-        if (!member.permissions.has('BanMembers')) {
+        if (!isAdmin && !member.permissions.has('BanMembers')) {
           return await interaction.reply({ content: 'You need Ban Members permission to use this command.', flags: 64 });
         }
         break;
       case 'kick':
       case 'warn':
-        if (!member.permissions.has('KickMembers')) {
+        if (!isAdmin && !member.permissions.has('KickMembers')) {
           return await interaction.reply({ content: 'You need Kick Members permission to use this command.', flags: 64 });
         }
         break;
       case 'timeout':
-        if (!member.permissions.has('ModerateMembers')) {
+        if (!isAdmin && !member.permissions.has('ModerateMembers')) {
           return await interaction.reply({ content: 'You need Moderate Members permission to use this command.', flags: 64 });
         }
         break;
@@ -351,8 +354,8 @@ module.exports = {
           const categorySubcommand = interaction.options.getSubcommand();
           
           if (categorySubcommand === 'add') {
-            // Check if user has Manage Channels permission
-            if (!interaction.member.permissions.has('ManageChannels')) {
+            // Check if user has Manage Channels permission or is bot admin
+            if (!isAdmin && !interaction.member.permissions.has('ManageChannels')) {
               return await interaction.reply({ content: 'You need Manage Channels permission to use this command.', flags: 64 });
             }
             
@@ -377,8 +380,8 @@ module.exports = {
 
             await interaction.reply({ embeds: [categoryAddEmbed] });
           } else if (categorySubcommand === 'delete') {
-            // Check if user has Manage Channels permission
-            if (!interaction.member.permissions.has('ManageChannels')) {
+            // Check if user has Manage Channels permission or is bot admin
+            if (!isAdmin && !interaction.member.permissions.has('ManageChannels')) {
               return await interaction.reply({ content: 'You need Manage Channels permission to use this command.', flags: 64 });
             }
             

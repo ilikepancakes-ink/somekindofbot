@@ -1,5 +1,7 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import * as path from 'path';
+import * as dotenv from 'dotenv';
+dotenv.config();
 const { getGuildStats, setGuildStats } = require(path.join(__dirname, '../../database'));
 
 module.exports = {
@@ -17,9 +19,14 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
     .setDMPermission(true),
 
-  async execute(interaction: any) {
+  async execute(interaction: any, isAdmin: boolean = false) {
     if (!interaction.guild) {
       return await interaction.reply({ content: 'This command can only be used in a server.', flags: 64 });
+    }
+
+    // Check if user has Manage Guild permission or is bot admin
+    if (!isAdmin && !interaction.member.permissions.has('ManageGuild')) {
+      return await interaction.reply({ content: 'You need Manage Guild permission to use this command.', flags: 64 });
     }
 
     const subcommand = interaction.options.getSubcommand();
