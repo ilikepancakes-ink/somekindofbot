@@ -180,41 +180,99 @@ module.exports = {
     try {
       switch (subcommand) {
         case 'ban':
-          await interaction.guild.members.ban(targetUser, { reason });
-
-          // Log the moderation action
-          await createModerationLog({
-            guild_id: interaction.guild.id,
-            user_id: targetUser.id,
-            moderator_id: interaction.user.id,
-            action_type: 'ban',
-            reason: reason,
-            timestamp: Date.now()
-          });
-
-          const banEmbed = new EmbedBuilder()
-            .setTimestamp()
-            .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-            .setTitle('🔨 User Banned')
-            .setDescription(`${targetUser.username} has been banned from the server`)
+          // Create DM notification embed
+          const banNotificationEmbed = new EmbedBuilder()
+            .setTitle('🔨 You have been banned')
+            .setDescription(`You have been banned from **${interaction.guild.name}**`)
             .setColor(0xFF0000)
             .addFields(
-              { name: 'User', value: `${targetUser}`, inline: true },
-              { name: 'User ID', value: targetUser.id, inline: true },
+              { name: 'Moderator', value: `${interaction.user.username}`, inline: true },
               { name: 'Reason', value: reason, inline: false }
-            );
+            )
+            .setTimestamp();
 
-          await interaction.reply({ embeds: [banEmbed] });
+          try {
+            // Send DM to the user
+            await targetUser.send({ embeds: [banNotificationEmbed] });
+            
+            // Only ban after DM is successfully sent
+            await interaction.guild.members.ban(targetUser, { reason });
 
-          // Send log to webhook
-          const stats = await getGuildStats(interaction.guild.id);
-          if (stats && stats.log_webhook_url) {
-            try {
-              await axios.post(stats.log_webhook_url, {
-                embeds: [banEmbed.toJSON()]
-              });
-            } catch (logError) {
-              console.error('Error sending log to webhook:', logError);
+            // Log the moderation action
+            await createModerationLog({
+              guild_id: interaction.guild.id,
+              user_id: targetUser.id,
+              moderator_id: interaction.user.id,
+              action_type: 'ban',
+              reason: reason,
+              timestamp: Date.now()
+            });
+
+            const banEmbed = new EmbedBuilder()
+              .setTimestamp()
+              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+              .setTitle('🔨 User Banned')
+              .setDescription(`${targetUser.username} has been banned from the server`)
+              .setColor(0xFF0000)
+              .addFields(
+                { name: 'User', value: `${targetUser}`, inline: true },
+                { name: 'User ID', value: targetUser.id, inline: true },
+                { name: 'Reason', value: reason, inline: false }
+              );
+
+            await interaction.reply({ embeds: [banEmbed] });
+
+            // Send log to webhook
+            const stats = await getGuildStats(interaction.guild.id);
+            if (stats && stats.log_webhook_url) {
+              try {
+                await axios.post(stats.log_webhook_url, {
+                  embeds: [banEmbed.toJSON()]
+                });
+              } catch (logError) {
+                console.error('Error sending log to webhook:', logError);
+              }
+            }
+          } catch (dmError) {
+            // If DM fails, still proceed with ban but inform the moderator
+            console.error('Failed to send DM to user:', dmError);
+            
+            await interaction.guild.members.ban(targetUser, { reason });
+
+            // Log the moderation action
+            await createModerationLog({
+              guild_id: interaction.guild.id,
+              user_id: targetUser.id,
+              moderator_id: interaction.user.id,
+              action_type: 'ban',
+              reason: reason,
+              timestamp: Date.now()
+            });
+
+            const banEmbed = new EmbedBuilder()
+              .setTimestamp()
+              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+              .setTitle('🔨 User Banned (DM Failed)')
+              .setDescription(`${targetUser.username} has been banned from the server\n\n⚠️ **Note:** Could not send DM notification to the user`)
+              .setColor(0xFF0000)
+              .addFields(
+                { name: 'User', value: `${targetUser}`, inline: true },
+                { name: 'User ID', value: targetUser.id, inline: true },
+                { name: 'Reason', value: reason, inline: false }
+              );
+
+            await interaction.reply({ embeds: [banEmbed] });
+
+            // Send log to webhook
+            const stats = await getGuildStats(interaction.guild.id);
+            if (stats && stats.log_webhook_url) {
+              try {
+                await axios.post(stats.log_webhook_url, {
+                  embeds: [banEmbed.toJSON()]
+                });
+              } catch (logError) {
+                console.error('Error sending log to webhook:', logError);
+              }
             }
           }
           break;
@@ -223,41 +281,100 @@ module.exports = {
           if (!targetMember) {
             return await interaction.reply({ content: 'User not found in this server.', flags: 64 });
           }
-          await targetMember.kick(reason);
 
-          // Log the moderation action
-          await createModerationLog({
-            guild_id: interaction.guild.id,
-            user_id: targetUser.id,
-            moderator_id: interaction.user.id,
-            action_type: 'kick',
-            reason: reason,
-            timestamp: Date.now()
-          });
-
-          const kickEmbed = new EmbedBuilder()
-            .setTimestamp()
-            .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-            .setTitle('👢 User Kicked')
-            .setDescription(`${targetMember.user.username} has been kicked from the server`)
+          // Create DM notification embed
+          const kickNotificationEmbed = new EmbedBuilder()
+            .setTitle('👢 You have been kicked')
+            .setDescription(`You have been kicked from **${interaction.guild.name}**`)
             .setColor(0xFFA500)
             .addFields(
-              { name: 'User', value: `${targetMember.user}`, inline: true },
-              { name: 'User ID', value: targetMember.user.id, inline: true },
+              { name: 'Moderator', value: `${interaction.user.username}`, inline: true },
               { name: 'Reason', value: reason, inline: false }
-            );
+            )
+            .setTimestamp();
 
-          await interaction.reply({ embeds: [kickEmbed] });
+          try {
+            // Send DM to the user
+            await targetUser.send({ embeds: [kickNotificationEmbed] });
+            
+            // Only kick after DM is successfully sent
+            await targetMember.kick(reason);
 
-          // Send log to webhook
-          const kickStats = await getGuildStats(interaction.guild.id);
-          if (kickStats && kickStats.log_webhook_url) {
-            try {
-              await axios.post(kickStats.log_webhook_url, {
-                embeds: [kickEmbed.toJSON()]
-              });
-            } catch (logError) {
-              console.error('Error sending log to webhook:', logError);
+            // Log the moderation action
+            await createModerationLog({
+              guild_id: interaction.guild.id,
+              user_id: targetUser.id,
+              moderator_id: interaction.user.id,
+              action_type: 'kick',
+              reason: reason,
+              timestamp: Date.now()
+            });
+
+            const kickEmbed = new EmbedBuilder()
+              .setTimestamp()
+              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+              .setTitle('👢 User Kicked')
+              .setDescription(`${targetMember.user.username} has been kicked from the server`)
+              .setColor(0xFFA500)
+              .addFields(
+                { name: 'User', value: `${targetMember.user}`, inline: true },
+                { name: 'User ID', value: targetMember.user.id, inline: true },
+                { name: 'Reason', value: reason, inline: false }
+              );
+
+            await interaction.reply({ embeds: [kickEmbed] });
+
+            // Send log to webhook
+            const kickStats = await getGuildStats(interaction.guild.id);
+            if (kickStats && kickStats.log_webhook_url) {
+              try {
+                await axios.post(kickStats.log_webhook_url, {
+                  embeds: [kickEmbed.toJSON()]
+                });
+              } catch (logError) {
+                console.error('Error sending log to webhook:', logError);
+              }
+            }
+          } catch (dmError) {
+            // If DM fails, still proceed with kick but inform the moderator
+            console.error('Failed to send DM to user:', dmError);
+            
+            await targetMember.kick(reason);
+
+            // Log the moderation action
+            await createModerationLog({
+              guild_id: interaction.guild.id,
+              user_id: targetUser.id,
+              moderator_id: interaction.user.id,
+              action_type: 'kick',
+              reason: reason,
+              timestamp: Date.now()
+            });
+
+            const kickEmbed = new EmbedBuilder()
+              .setTimestamp()
+              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+              .setTitle('👢 User Kicked (DM Failed)')
+              .setDescription(`${targetMember.user.username} has been kicked from the server\n\n⚠️ **Note:** Could not send DM notification to the user`)
+              .setColor(0xFFA500)
+              .addFields(
+                { name: 'User', value: `${targetMember.user}`, inline: true },
+                { name: 'User ID', value: targetMember.user.id, inline: true },
+                { name: 'Reason', value: reason, inline: false }
+              );
+
+            await interaction.reply({ embeds: [kickEmbed] });
+
+            // Send log to webhook
+            const kickStats = await getGuildStats(interaction.guild.id);
+            if (kickStats && kickStats.log_webhook_url) {
+              try {
+                await axios.post(kickStats.log_webhook_url, {
+                  embeds: [kickEmbed.toJSON()]
+                });
+              } catch (logError) {
+                console.error('Error sending log to webhook:', logError);
+              }
             }
           }
           break;
@@ -267,84 +384,205 @@ module.exports = {
             return await interaction.reply({ content: 'User not found in this server.', flags: 64 });
           }
           const duration = interaction.options.getInteger('duration');
-          await targetMember.timeout(duration * 60 * 1000, reason);
 
-          // Log the moderation action
-          await createModerationLog({
-            guild_id: interaction.guild.id,
-            user_id: targetUser.id,
-            moderator_id: interaction.user.id,
-            action_type: 'timeout',
-            reason: reason,
-            duration: duration,
-            timestamp: Date.now()
-          });
-
-          const endTime = new Date(Date.now() + duration * 60 * 1000);
-          const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false });
-          const timeoutEmbed = new EmbedBuilder()
-            .setTimestamp()
-            .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-            .setTitle('⏰ User Timed Out')
-            .setDescription(`${targetMember.user.username} has been timed out until ${cetTime} CET`)
+          // Create DM notification embed
+          const timeoutNotificationEmbed = new EmbedBuilder()
+            .setTitle('⏰ You have been timed out')
+            .setDescription(`You have been timed out in **${interaction.guild.name}**`)
             .setColor(0xFFFF00)
             .addFields(
-              { name: 'User', value: `${targetMember.user}`, inline: true },
-              { name: 'User ID', value: targetMember.user.id, inline: true },
+              { name: 'Moderator', value: `${interaction.user.username}`, inline: true },
               { name: 'Duration', value: `${duration} minutes`, inline: true },
-              { name: 'Ends at', value: cetTime + ' CET', inline: true },
+              { name: 'Ends at', value: new Date(Date.now() + duration * 60 * 1000).toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false }) + ' CET', inline: true },
               { name: 'Reason', value: reason, inline: false }
-            );
+            )
+            .setTimestamp();
 
-          await interaction.reply({ embeds: [timeoutEmbed] });
+          try {
+            // Send DM to the user
+            await targetUser.send({ embeds: [timeoutNotificationEmbed] });
+            
+            // Only timeout after DM is successfully sent
+            await targetMember.timeout(duration * 60 * 1000, reason);
 
-          // Send log to webhook
-          const timeoutStats = await getGuildStats(interaction.guild.id);
-          if (timeoutStats && timeoutStats.log_webhook_url) {
-            try {
-              await axios.post(timeoutStats.log_webhook_url, {
-                embeds: [timeoutEmbed.toJSON()]
-              });
-            } catch (logError) {
-              console.error('Error sending log to webhook:', logError);
+            // Log the moderation action
+            await createModerationLog({
+              guild_id: interaction.guild.id,
+              user_id: targetUser.id,
+              moderator_id: interaction.user.id,
+              action_type: 'timeout',
+              reason: reason,
+              duration: duration,
+              timestamp: Date.now()
+            });
+
+            const endTime = new Date(Date.now() + duration * 60 * 1000);
+            const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false });
+            const timeoutEmbed = new EmbedBuilder()
+              .setTimestamp()
+              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+              .setTitle('⏰ User Timed Out')
+              .setDescription(`${targetMember.user.username} has been timed out until ${cetTime} CET`)
+              .setColor(0xFFFF00)
+              .addFields(
+                { name: 'User', value: `${targetMember.user}`, inline: true },
+                { name: 'User ID', value: targetMember.user.id, inline: true },
+                { name: 'Duration', value: `${duration} minutes`, inline: true },
+                { name: 'Ends at', value: cetTime + ' CET', inline: true },
+                { name: 'Reason', value: reason, inline: false }
+              );
+
+            await interaction.reply({ embeds: [timeoutEmbed] });
+
+            // Send log to webhook
+            const timeoutStats = await getGuildStats(interaction.guild.id);
+            if (timeoutStats && timeoutStats.log_webhook_url) {
+              try {
+                await axios.post(timeoutStats.log_webhook_url, {
+                  embeds: [timeoutEmbed.toJSON()]
+                });
+              } catch (logError) {
+                console.error('Error sending log to webhook:', logError);
+              }
+            }
+          } catch (dmError) {
+            // If DM fails, still proceed with timeout but inform the moderator
+            console.error('Failed to send DM to user:', dmError);
+            
+            await targetMember.timeout(duration * 60 * 1000, reason);
+
+            // Log the moderation action
+            await createModerationLog({
+              guild_id: interaction.guild.id,
+              user_id: targetUser.id,
+              moderator_id: interaction.user.id,
+              action_type: 'timeout',
+              reason: reason,
+              duration: duration,
+              timestamp: Date.now()
+            });
+
+            const endTime = new Date(Date.now() + duration * 60 * 1000);
+            const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false });
+            const timeoutEmbed = new EmbedBuilder()
+              .setTimestamp()
+              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+              .setTitle('⏰ User Timed Out (DM Failed)')
+              .setDescription(`${targetMember.user.username} has been timed out until ${cetTime} CET\n\n⚠️ **Note:** Could not send DM notification to the user`)
+              .setColor(0xFFFF00)
+              .addFields(
+                { name: 'User', value: `${targetMember.user}`, inline: true },
+                { name: 'User ID', value: targetMember.user.id, inline: true },
+                { name: 'Duration', value: `${duration} minutes`, inline: true },
+                { name: 'Ends at', value: cetTime + ' CET', inline: true },
+                { name: 'Reason', value: reason, inline: false }
+              );
+
+            await interaction.reply({ embeds: [timeoutEmbed] });
+
+            // Send log to webhook
+            const timeoutStats = await getGuildStats(interaction.guild.id);
+            if (timeoutStats && timeoutStats.log_webhook_url) {
+              try {
+                await axios.post(timeoutStats.log_webhook_url, {
+                  embeds: [timeoutEmbed.toJSON()]
+                });
+              } catch (logError) {
+                console.error('Error sending log to webhook:', logError);
+              }
             }
           }
           break;
 
         case 'warn':
-          // Log the moderation action
-          await createModerationLog({
-            guild_id: interaction.guild.id,
-            user_id: targetUser.id,
-            moderator_id: interaction.user.id,
-            action_type: 'warn',
-            reason: reason,
-            timestamp: Date.now()
-          });
-
-          const warnEmbed = new EmbedBuilder()
-            .setTimestamp()
-            .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
-            .setTitle('⚠️ User Warned')
-            .setDescription(`${targetUser.username} has been warned`)
+          // Create DM notification embed
+          const warnNotificationEmbed = new EmbedBuilder()
+            .setTitle('⚠️ You have been warned')
+            .setDescription(`You have been warned in **${interaction.guild.name}**`)
             .setColor(0xFFA500)
             .addFields(
-              { name: 'User', value: `${targetUser}`, inline: true },
-              { name: 'User ID', value: targetUser.id, inline: true },
+              { name: 'Moderator', value: `${interaction.user.username}`, inline: true },
               { name: 'Reason', value: reason, inline: false }
-            );
+            )
+            .setTimestamp();
 
-          await interaction.reply({ embeds: [warnEmbed] });
+          try {
+            // Send DM to the user
+            await targetUser.send({ embeds: [warnNotificationEmbed] });
+            
+            // Log the moderation action
+            await createModerationLog({
+              guild_id: interaction.guild.id,
+              user_id: targetUser.id,
+              moderator_id: interaction.user.id,
+              action_type: 'warn',
+              reason: reason,
+              timestamp: Date.now()
+            });
 
-          // Send log to webhook
-          const warnStats = await getGuildStats(interaction.guild.id);
-          if (warnStats && warnStats.log_webhook_url) {
-            try {
-              await axios.post(warnStats.log_webhook_url, {
-                embeds: [warnEmbed.toJSON()]
-              });
-            } catch (logError) {
-              console.error('Error sending log to webhook:', logError);
+            const warnEmbed = new EmbedBuilder()
+              .setTimestamp()
+              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+              .setTitle('⚠️ User Warned')
+              .setDescription(`${targetUser.username} has been warned`)
+              .setColor(0xFFA500)
+              .addFields(
+                { name: 'User', value: `${targetUser}`, inline: true },
+                { name: 'User ID', value: targetUser.id, inline: true },
+                { name: 'Reason', value: reason, inline: false }
+              );
+
+            await interaction.reply({ embeds: [warnEmbed] });
+
+            // Send log to webhook
+            const warnStats = await getGuildStats(interaction.guild.id);
+            if (warnStats && warnStats.log_webhook_url) {
+              try {
+                await axios.post(warnStats.log_webhook_url, {
+                  embeds: [warnEmbed.toJSON()]
+                });
+              } catch (logError) {
+                console.error('Error sending log to webhook:', logError);
+              }
+            }
+          } catch (dmError) {
+            // If DM fails, still proceed with warn but inform the moderator
+            console.error('Failed to send DM to user:', dmError);
+            
+            // Log the moderation action
+            await createModerationLog({
+              guild_id: interaction.guild.id,
+              user_id: targetUser.id,
+              moderator_id: interaction.user.id,
+              action_type: 'warn',
+              reason: reason,
+              timestamp: Date.now()
+            });
+
+            const warnEmbed = new EmbedBuilder()
+              .setTimestamp()
+              .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+              .setTitle('⚠️ User Warned (DM Failed)')
+              .setDescription(`${targetUser.username} has been warned\n\n⚠️ **Note:** Could not send DM notification to the user`)
+              .setColor(0xFFA500)
+              .addFields(
+                { name: 'User', value: `${targetUser}`, inline: true },
+                { name: 'User ID', value: targetUser.id, inline: true },
+                { name: 'Reason', value: reason, inline: false }
+              );
+
+            await interaction.reply({ embeds: [warnEmbed] });
+
+            // Send log to webhook
+            const warnStats = await getGuildStats(interaction.guild.id);
+            if (warnStats && warnStats.log_webhook_url) {
+              try {
+                await axios.post(warnStats.log_webhook_url, {
+                  embeds: [warnEmbed.toJSON()]
+                });
+              } catch (logError) {
+                console.error('Error sending log to webhook:', logError);
+              }
             }
           }
           break;
