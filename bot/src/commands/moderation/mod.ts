@@ -393,7 +393,7 @@ module.exports = {
             .addFields(
               { name: 'Moderator', value: `${interaction.user.username}`, inline: true },
               { name: 'Duration', value: `${duration} minutes`, inline: true },
-              { name: 'Ends at', value: new Date(Date.now() + duration * 60 * 1000).toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false }) + ' CET', inline: true },
+              { name: 'Ends at', value: new Date(Date.now() + duration * 60 * 1000).toLocaleString('en-GB', { timeZone: 'Europe/Amsterdam', hour12: false }) + ' CET', inline: true },
               { name: 'Reason', value: reason, inline: false }
             )
             .setTimestamp();
@@ -416,8 +416,8 @@ module.exports = {
               timestamp: Date.now()
             });
 
-            const endTime = new Date(Date.now() + duration * 60 * 1000);
-            const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false });
+          const endTime = new Date(Date.now() + duration * 60 * 1000);
+          const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Amsterdam', hour12: false });
             const timeoutEmbed = new EmbedBuilder()
               .setTimestamp()
               .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
@@ -463,7 +463,7 @@ module.exports = {
             });
 
             const endTime = new Date(Date.now() + duration * 60 * 1000);
-            const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Paris', hour12: false });
+            const cetTime = endTime.toLocaleString('en-GB', { timeZone: 'Europe/Amsterdam', hour12: false });
             const timeoutEmbed = new EmbedBuilder()
               .setTimestamp()
               .setFooter({ text: `Moderator: ${interaction.user.username}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
