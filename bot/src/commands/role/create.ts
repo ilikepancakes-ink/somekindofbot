@@ -97,7 +97,7 @@ module.exports = {
         .addSubcommand(subcommand =>
           subcommand
             .setName('create')
-            .setDescription('Create a persistent role selection embed with buttons')
+            .setDescription('Create a role selection embed')
             .addStringOption(option =>
               option.setName('title')
                 .setDescription('The title of the embed')
