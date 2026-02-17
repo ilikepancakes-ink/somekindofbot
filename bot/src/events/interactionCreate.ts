@@ -32,7 +32,14 @@ module.exports = {
         }
       }
     } else if (interaction.isButton()) {
-      if (interaction.customId.startsWith('rule34_')) {
+      // Handle confessions button interactions
+      if (interaction.customId === 'confess_button') {
+        const { handleButtonInteraction } = require(path.join(__dirname, '../commands/confessions/confessions'));
+        await handleButtonInteraction(interaction);
+      } else if (interaction.customId === 'reply_to_confession') {
+        const { handleButtonInteraction } = require(path.join(__dirname, '../commands/confessions/confessions'));
+        await handleButtonInteraction(interaction);
+      } else if (interaction.customId.startsWith('rule34_')) {
         const parts = interaction.customId.split('_');
         const action = parts[1];
         const id = parts[2];
@@ -277,7 +284,11 @@ module.exports = {
         // The help command handles its own button interactions
       }
     } else if (interaction.isModalSubmit()) {
-      if (interaction.customId === 'xp_nuke_modal') {
+      // Handle confessions modal submissions
+      if (interaction.customId === 'confession_modal' || interaction.customId === 'anonymous_reply_modal') {
+        const { handleModalSubmit } = require(path.join(__dirname, '../commands/confessions/confessions'));
+        await handleModalSubmit(interaction);
+      } else if (interaction.customId === 'xp_nuke_modal') {
         const confirmText = interaction.fields.getTextInputValue('confirm_text');
 
         if (confirmText.toUpperCase() !== 'CONFIRM') {

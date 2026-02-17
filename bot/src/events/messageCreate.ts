@@ -547,6 +547,12 @@ module.exports = {
           }
         }
 
+        // Handle confessions thread replies
+        if (message.channel.isThread()) {
+          const { handleMessage } = require(path.join(__dirname, '../commands/confessions/confessions'));
+          await handleMessage(message);
+        }
+
         // Check if this is a ticket channel
         const ticket = await getTicketByChannel(message.channel.id);
         if (!ticket) return;
