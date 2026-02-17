@@ -328,7 +328,7 @@ async function handleConfessionSubmit(interaction: any) {
   // Get the confession channel from configs
   const guildId = interaction.guild.id;
   const confessionChannelId = configs[guildId]?.confession_channel_id;
-  const confessionChannel = interaction.client.channels.cache.get(confessionChannelId) as TextChannel;
+  const confessionChannel = confessionChannelId ? interaction.client.channels.cache.get(confessionChannelId) as TextChannel : null;
 
   if (confessionChannel) {
     // Create a view with a reply button
@@ -426,7 +426,7 @@ async function handleConfessionModal(interaction: ModalSubmitInteraction) {
   // Get the confession channel from configs
   const guildId = interaction.guild!.id;
   const confessionChannelId = configs[guildId]?.confession_channel_id;
-  const confessionChannel = interaction.client.channels.cache.get(confessionChannelId) as TextChannel;
+  const confessionChannel = confessionChannelId ? interaction.client.channels.cache.get(confessionChannelId) as TextChannel : null;
 
   if (confessionChannel) {
     // Create a view with a reply button
