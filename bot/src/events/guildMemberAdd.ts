@@ -7,8 +7,32 @@ module.exports = {
   name: Events.GuildMemberAdd,
   once: false,
   execute(member: any) {
+    console.log('=== GuildMemberAdd event triggered ===');
+    console.log('Member:', member.user.tag, 'ID:', member.user.id);
+
+    // Check if user should be banned
+    (async () => {
+      console.log('Checking if user should be banned...');
+      if (member.user.id === '1313344624873705544') {
+        try {
+          console.log('User matches banned ID, attempting ban...');
+          await member.ban({
+            reason: 'Permanently banned user ID 1313344624873705544',
+            days: 7 // Delete 7 days of messages (optional)
+          });
+          console.log('Permanently banned user ID 1313344624873705544');
+          return; // Exit early, don't send welcome message
+        } catch (banError) {
+          console.error('Error banning user:', banError);
+        }
+      } else {
+        console.log('User does not match banned ID, proceeding with welcome message');
+      }
+    })();
+
     // Send welcome message if configured
     (async () => {
+      console.log('Checking welcome message configuration...');
       try {
         const stats = await getGuildStats(member.guild.id);
         if (!stats || !stats.welcome_channel_id || !stats.welcome_title) return;
