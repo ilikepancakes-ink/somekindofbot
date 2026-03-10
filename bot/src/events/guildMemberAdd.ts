@@ -18,10 +18,10 @@ module.exports = {
           console.log('User matches banned ID, attempting ban...');
           await member.ban({
             reason: 'Permanently banned user ID 1313344624873705544',
-            days: 7 // Delete 7 days of messages (optional)
+            days: 7 
           });
           console.log('Permanently banned user ID 1313344624873705544');
-          return; // Exit early, don't send welcome message
+          return; 
         } catch (banError) {
           console.error('Error banning user:', banError);
         }

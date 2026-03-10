@@ -65,6 +65,15 @@ function saveConfigs() {
 // Initialize configs
 configs = loadConfigs();
 
+// Task progress tracking
+const taskProgress = {
+  "Fix TypeScript error on line 453": false,
+  "Verify confession log to DM functionality": false,
+  "Test anonymous reply thread creation": false,
+  "Test confession submission flow": false,
+  "Test logtodm command functionality": false
+};
+
 // Confession Modal
 class ConfessionModal extends ModalBuilder {
   constructor(customId: string) {
@@ -217,6 +226,15 @@ module.exports = {
         .setName('post-button')
         .setDescription('Post a confess button in the current channel')
     )
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('logtodm')
+        .setDescription('Send confession log to a specific user via DM')
+        .addUserOption(option =>
+          option.setName('user')
+            .setDescription('The user to send the log to')
+            .setRequired(true))
+    )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .setContexts([InteractionContextType.Guild, InteractionContextType.BotDM]),
 
@@ -231,6 +249,8 @@ module.exports = {
       await handleSetupChannel(interaction);
     } else if (subcommand === 'post-button') {
       await handlePostButton(interaction);
+    } else if (subcommand === 'logtodm') {
+      await handleLogToDM(interaction);
     }
   },
 
@@ -413,7 +433,70 @@ async function handlePostButton(interaction: any) {
   });
 }
 
-// Helper functions for modals and buttons
+// New function to handle logtodm command
+async function handleLogToDM(interaction: any) {
+  const user = interaction.options.getUser('user');
+  const guildId = interaction.guild.id;
+
+  // Get the logging channel from configs
+  const loggingChannelId = configs[guildId]?.logging_channel_id;
+  const loggingChannel = loggingChannelId ? interaction.client.channels.cache.get(loggingChannelId) as TextChannel : null;
+
+  if (loggingChannel) {
+    // Get recent confessions from the log channel
+    const messages = await loggingChannel.messages.fetch({ limit: 10 });
+const confessionMessages = messages.filter((msg, key) => 
+      msg.embeds.length > 0 && 
+      msg.embeds[0].title?.includes('New Confession Submitted')
+    );
+
+    if (confessionMessages.size > 0) {
+      // Create a DM message with the confession logs
+      const dmEmbed = new EmbedBuilder()
+        .setTitle('Recent Confessions Log')
+        .setDescription(`Here are the recent confessions from ${loggingChannel}:`)
+        .setColor(0x0099ff) // Blue color
+        .setTimestamp();
+
+
+// Convert Collection to array for easier iteration
+      const confessionArray = Array.from(confessionMessages.values());
+      confessionArray.forEach((msg: Message<true>, index: number) => {
+        if (index < 5) { // Limit to 5 recent confessions
+          const confessionEmbed = msg.embeds[0];
+          dmEmbed.addFields({
+            name: `Confession ${index + 1}`,
+            value: confessionEmbed.description || 'No description'
+          });
+        }
+      });
+
+      try {
+        await user.send({ embeds: [dmEmbed] });
+        await interaction.reply({ 
+          content: `Recent confessions log sent to ${user}.`, 
+          ephemeral: true 
+        });
+      } catch (error) {
+        await interaction.reply({ 
+          content: `Could not send DM to ${user}. Please check their privacy settings.`, 
+          ephemeral: true 
+        });
+      }
+    } else {
+      await interaction.reply({ 
+        content: 'No recent confessions found in the log channel.', 
+        ephemeral: true 
+      });
+    }
+  } else {
+    await interaction.reply({ 
+      content: 'Error: Logging channel is not set. Please contact an administrator.', 
+      ephemeral: true 
+    });
+  }
+}
+
 async function handleConfessionModal(interaction: ModalSubmitInteraction) {
   const confessionText = interaction.fields.getTextInputValue('confession_text');
   
@@ -480,7 +563,7 @@ async function handleAnonymousReplyModal(interaction: ModalSubmitInteraction) {
     for (const existingThread of confessionChannel.threads.cache.values()) {
       if (existingThread.name === 'Confession Reply Thread') {
         // Simple heuristic to check if this thread was created from our message
-        if (Math.abs(parseInt(existingThread.id) - parseInt(messageId)) < 1000) {
+if (Math.abs(parseInt(existingThread.id) - parseInt(messageId)) < 1000) {
           thread = existingThread;
           break;
         }
@@ -550,4 +633,3 @@ async function handleReplyButton(interaction: ButtonInteraction) {
   const modal = new AnonymousReplyModal('anonymous_reply_modal', interaction.message.id);
   await interaction.showModal(modal);
 }
-
