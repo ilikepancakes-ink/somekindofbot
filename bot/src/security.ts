@@ -1,4 +1,4 @@
-import { Interaction, GuildMember, PermissionFlagsBits, EmbedBuilder } from 'discord.js';
+import { Interaction, GuildMember, PermissionFlagsBits, EmbedBuilder, CommandInteraction, AutocompleteInteraction, ChatInputCommandInteraction } from 'discord.js';
 import * as crypto from 'crypto';
 
 // Rate limiting for Discord interactions
@@ -24,7 +24,7 @@ export class SecurityManager {
     }
 
     const member = await interaction.guild.members.fetch(interaction.user.id);
-    const isAdmin = process.env.BOT_ADMIN_USER_ID && interaction.user.id === process.env.BOT_ADMIN_USER_ID;
+    const isAdmin = process.env.BOT_ADMIN_USER_ID ? interaction.user.id === process.env.BOT_ADMIN_USER_ID : false;
 
     // Rate limiting
     const ip = interaction.user.id; // Use user ID as identifier
@@ -50,29 +50,36 @@ export class SecurityManager {
     // Command-specific permission validation
     switch (commandName) {
       case 'xp':
-        const subcommand = interaction.options?.getSubcommand();
-        if (subcommand === 'edit' || subcommand === 'nuke') {
-          return member.permissions.has(PermissionFlagsBits.Administrator) || isAdmin;
+        if (interaction.isChatInputCommand()) {
+          const subcommand = interaction.options.getSubcommand();
+          if (subcommand === 'edit' || subcommand === 'nuke') {
+            return member.permissions.has(PermissionFlagsBits.Administrator) || isAdmin;
+          }
         }
         return true;
 
       case 'mod':
-        const modSubcommand = interaction.options?.getSubcommand();
-        switch (modSubcommand) {
-          case 'ban':
-            return member.permissions.has(PermissionFlagsBits.BanMembers) || isAdmin;
-          case 'kick':
-            return member.permissions.has(PermissionFlagsBits.KickMembers) || isAdmin;
-          case 'timeout':
-            return member.permissions.has(PermissionFlagsBits.ModerateMembers) || isAdmin;
-          default:
-            return member.permissions.has(PermissionFlagsBits.ManageGuild) || isAdmin;
+        if (interaction.isChatInputCommand()) {
+          const modSubcommand = interaction.options.getSubcommand();
+          switch (modSubcommand) {
+            case 'ban':
+              return member.permissions.has(PermissionFlagsBits.BanMembers) || isAdmin;
+            case 'kick':
+              return member.permissions.has(PermissionFlagsBits.KickMembers) || isAdmin;
+            case 'timeout':
+              return member.permissions.has(PermissionFlagsBits.ModerateMembers) || isAdmin;
+            default:
+              return member.permissions.has(PermissionFlagsBits.ManageGuild) || isAdmin;
+          }
         }
+        return member.permissions.has(PermissionFlagsBits.ManageGuild) || isAdmin;
 
       case 'role':
-        const roleSubcommand = interaction.options?.getSubcommand();
-        if (roleSubcommand === 'create' || roleSubcommand === 'delete' || roleSubcommand === 'edit') {
-          return member.permissions.has(PermissionFlagsBits.ManageRoles) || isAdmin;
+        if (interaction.isChatInputCommand()) {
+          const roleSubcommand = interaction.options.getSubcommand();
+          if (roleSubcommand === 'create' || roleSubcommand === 'delete' || roleSubcommand === 'edit') {
+            return member.permissions.has(PermissionFlagsBits.ManageRoles) || isAdmin;
+          }
         }
         return true;
 
@@ -138,10 +145,16 @@ export class SecurityManager {
         .setColor(0xFF0000)
         .setTimestamp();
 
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({ embeds: [embed], flags: 64 });
-      } else {
-        await interaction.reply({ embeds: [embed], flags: 64 });
+      // Check if interaction is a command interaction before accessing replied/deferred
+      if (interaction.isChatInputCommand()) {
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({ embeds: [embed], flags: 64 });
+        } else {
+          await interaction.reply({ embeds: [embed], flags: 64 });
+        }
+      } else if (interaction.isAutocomplete()) {
+        // For autocomplete interactions, just try to reply
+        await (interaction as AutocompleteInteraction).respond([]);
       }
     } catch (error) {
       console.error('Failed to send security alert:', error);

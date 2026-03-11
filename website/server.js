@@ -194,6 +194,11 @@ app.get('/bot/features/download/command/:filename', async (req, res) => {
   }
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(400).send('Server is running');
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Website server running on port ${port}`);
