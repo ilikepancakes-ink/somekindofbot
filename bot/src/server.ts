@@ -16,25 +16,69 @@ const clientSecret = process.env.DISCORD_CLIENT_SECRET!;
 const botToken = process.env.DISCORD_TOKEN!;
 const botAdminUserId = process.env.BOT_ADMIN_USER_ID!;
 
-// Auth middleware
+// Enhanced Auth middleware with rate limiting and security checks
+const authAttempts = new Map();
 const auth = async (req: any, res: any, next: any) => {
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(' ')[1];
+  const ip = req.ip || req.connection.remoteAddress;
+
+  // Rate limiting for auth attempts
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 minutes
+  const maxAttempts = 10;
+  
+  if (!authAttempts.has(ip)) {
+    authAttempts.set(ip, []);
+  }
+  
+  const attempts = authAttempts.get(ip);
+  const validAttempts = attempts.filter((time: number) => now - time < windowMs);
+  
+  if (validAttempts.length >= maxAttempts) {
+    console.warn(`🚫 Rate limit exceeded for IP ${ip}`);
+    return res.status(429).json({ error: 'Too many authentication attempts. Please try again later.' });
+  }
 
   console.log(`🔐 Auth Check for ${req.method} ${req.path}:`);
   console.log(`   Auth Header: ${authHeader ? '[PRESENT]' : 'MISSING'}`);
   console.log(`   Extracted Token: ${token ? token.substring(0, 20) + '...' : 'NONE'}`);
+  console.log(`   IP: ${ip}`);
 
   if (!token) {
+    validAttempts.push(now);
+    authAttempts.set(ip, validAttempts);
     console.warn(`🚫 Auth failed for ${req.method} ${req.path}: No token`);
-    return res.status(401).send('Unauthorized');
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+
+  // Validate token format (should be 64 hex characters)
+  if (!/^[a-f0-9]{64}$/.test(token)) {
+    validAttempts.push(now);
+    authAttempts.set(ip, validAttempts);
+    console.warn(`🚫 Auth failed for ${req.method} ${req.path}: Invalid token format`);
+    return res.status(401).json({ error: 'Unauthorized: Invalid token format' });
   }
 
   try {
     const session = await getSession(token);
     if (!session) {
+      validAttempts.push(now);
+      authAttempts.set(ip, validAttempts);
       console.warn(`🚫 Auth failed for ${req.method} ${req.path}: Session not found`);
-      return res.status(401).send('Unauthorized');
+      return res.status(401).json({ error: 'Unauthorized: Invalid session' });
+    }
+
+    // Check if session is too old (30 days)
+    const sessionAge = Date.now() - session.created_at;
+    const maxSessionAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+    
+    if (sessionAge > maxSessionAge) {
+      await deleteExpiredSessions();
+      validAttempts.push(now);
+      authAttempts.set(ip, validAttempts);
+      console.warn(`🚫 Auth failed for ${req.method} ${req.path}: Session expired`);
+      return res.status(401).json({ error: 'Unauthorized: Session expired' });
     }
 
     req.userId = session.user_id;
@@ -43,8 +87,67 @@ const auth = async (req: any, res: any, next: any) => {
     next();
   } catch (e) {
     console.error(`❌ Auth error: ${e}`);
-    res.status(500).send('Auth error');
+    res.status(500).json({ error: 'Authentication service unavailable' });
   }
+};
+
+// Enhanced input validation middleware
+const validateInput = (schema: any) => {
+  return (req: any, res: any, next: any) => {
+    const errors: string[] = [];
+    
+    // Validate guild ID format (Discord guild IDs are 17-19 digits)
+    if (req.query.guildId && !/^\d{17,19}$/.test(req.query.guildId)) {
+      errors.push('Invalid guild ID format');
+    }
+    
+    // Validate user ID format (Discord user IDs are 17-19 digits)
+    if (req.body.userId && !/^\d{17,19}$/.test(req.body.userId)) {
+      errors.push('Invalid user ID format');
+    }
+    
+    // Validate role ID format (Discord role IDs are 17-19 digits)
+    if (req.body.roleId && !/^\d{17,19}$/.test(req.body.roleId)) {
+      errors.push('Invalid role ID format');
+    }
+    
+    // Validate reason length
+    if (req.body.reason && req.body.reason.length > 500) {
+      errors.push('Reason too long (max 500 characters)');
+    }
+    
+    // Validate color format
+    if (req.body.color && !/^#[0-9A-Fa-f]{6}$/.test(req.body.color)) {
+      errors.push('Invalid color format (must be #RRGGBB)');
+    }
+
+    // Validate channel ID format
+    if (req.body.channelId && !/^\d{17,19}$/.test(req.body.channelId)) {
+      errors.push('Invalid channel ID format');
+    }
+
+    // Validate message ID format
+    if (req.body.messageId && !/^\d{17,19}$/.test(req.body.messageId)) {
+      errors.push('Invalid message ID format');
+    }
+
+    if (errors.length > 0) {
+      console.warn(`🚫 Input validation failed: ${errors.join(', ')}`);
+      return res.status(400).json({ error: 'Invalid input', details: errors });
+    }
+    
+    next();
+  };
+};
+
+// Security headers middleware
+const securityHeaders = (req: any, res: any, next: any) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
 };
 
 app.get('/callback', async (req, res) => {

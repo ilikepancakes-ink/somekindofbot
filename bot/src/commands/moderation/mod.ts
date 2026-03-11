@@ -153,25 +153,28 @@ module.exports = {
 
     // Check permissions
     const member = interaction.member;
-    if (!member.permissions.has) {
+    // Enhanced permission checking with bot admin override
+    const isBotAdmin = process.env.BOT_ADMIN_USER_ID && interaction.user.id === process.env.BOT_ADMIN_USER_ID;
+    
+    if (!isBotAdmin && !member.permissions.has('KickMembers')) {
       return await interaction.reply({ content: 'You do not have permission to use this command.', flags: 64 });
     }
 
     // Check specific permissions for each subcommand
     switch (subcommand) {
       case 'ban':
-        if (!isAdmin && !member.permissions.has('BanMembers')) {
+        if (!isBotAdmin && !member.permissions.has('BanMembers')) {
           return await interaction.reply({ content: 'You need Ban Members permission to use this command.', flags: 64 });
         }
         break;
       case 'kick':
       case 'warn':
-        if (!isAdmin && !member.permissions.has('KickMembers')) {
+        if (!isBotAdmin && !member.permissions.has('KickMembers')) {
           return await interaction.reply({ content: 'You need Kick Members permission to use this command.', flags: 64 });
         }
         break;
       case 'timeout':
-        if (!isAdmin && !member.permissions.has('ModerateMembers')) {
+        if (!isBotAdmin && !member.permissions.has('ModerateMembers')) {
           return await interaction.reply({ content: 'You need Moderate Members permission to use this command.', flags: 64 });
         }
         break;
@@ -593,7 +596,7 @@ module.exports = {
           
           if (categorySubcommand === 'add') {
             // Check if user has Manage Channels permission or is bot admin
-            if (!isAdmin && !interaction.member.permissions.has('ManageChannels')) {
+            if (!isBotAdmin && !interaction.member.permissions.has('ManageChannels')) {
               return await interaction.reply({ content: 'You need Manage Channels permission to use this command.', flags: 64 });
             }
             
@@ -619,7 +622,7 @@ module.exports = {
             await interaction.reply({ embeds: [categoryAddEmbed] });
           } else if (categorySubcommand === 'delete') {
             // Check if user has Manage Channels permission or is bot admin
-            if (!isAdmin && !interaction.member.permissions.has('ManageChannels')) {
+            if (!isBotAdmin && !interaction.member.permissions.has('ManageChannels')) {
               return await interaction.reply({ content: 'You need Manage Channels permission to use this command.', flags: 64 });
             }
             
