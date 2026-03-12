@@ -40,12 +40,21 @@ async function loadCommands() {
 
       delete require.cache[require.resolve(filePath)];
 
-      const command = require(filePath);
+      let command = require(filePath);
+      // some modules export with `export default {...}` when using ts-node/ESM
+      command = command.default || command;
 
       if (command.data && command.execute) {
         command.group = folder;
-        (client as any).commands.set(command.data.name, command);
-        commands.push(command.data.toJSON());
+        // Some commands export the raw JSON (from toJSON()) instead of a builder.
+        // Normalize so we always have an object with a name and a toJSON-compatible value.
+        let data = command.data;
+        if (typeof data.toJSON === 'function') {
+          data = data.toJSON();
+        }
+
+        (client as any).commands.set(data.name, command);
+        commands.push(data);
       } else {
         console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
       }
