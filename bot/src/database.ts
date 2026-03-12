@@ -539,6 +539,23 @@ function deleteBetterEmbedsMessage(originalMessageId: string): Promise<void> {
   });
 }
 
+// Starboard settings
+db.run(`CREATE TABLE IF NOT EXISTS starboard_settings (
+  guild_id TEXT PRIMARY KEY,
+  channel_id TEXT,
+  required_stars INTEGER DEFAULT 3
+)`);
+
+// Starboard messages
+db.run(`CREATE TABLE IF NOT EXISTS starboard_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT,
+  original_message_id TEXT,
+  starboard_message_id TEXT,
+  star_count INTEGER DEFAULT 0,
+  last_updated INTEGER
+)`);
+
 // Moderation log functions
 function createModerationLog(log: ModerationLog): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -642,6 +659,72 @@ async function cleanupExpiredDownloads(): Promise<void> {
   });
 }
 
+// Starboard functions
+function getStarboardSettings(guildId: string): Promise<any | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM starboard_settings WHERE guild_id = ?', [guildId], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+function setStarboardSettings(settings: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT OR REPLACE INTO starboard_settings (guild_id, channel_id, required_stars) VALUES (?, ?, ?)',
+      [settings.guild_id, settings.channel_id, settings.required_stars],
+      (err: any) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+function getStarboardMessage(originalMessageId: string): Promise<any | undefined> {
+  return new Promise((resolve, reject) => {
+    db.get('SELECT * FROM starboard_messages WHERE original_message_id = ?', [originalMessageId], (err: any, row: any) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+function createStarboardMessage(message: any): Promise<number> {
+  return new Promise((resolve, reject) => {
+    db.run(
+      'INSERT INTO starboard_messages (guild_id, original_message_id, starboard_message_id, star_count, last_updated) VALUES (?, ?, ?, ?, ?)',
+      [message.guild_id, message.original_message_id, message.starboard_message_id, message.star_count, message.last_updated],
+      function(this: any, err: any) {
+        if (err) reject(err);
+        else resolve(this.lastID);
+      }
+    );
+  });
+}
+
+function updateStarboardMessage(originalMessageId: string, starCount: number, starboardMessageId?: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const updateFields = starboardMessageId 
+      ? 'star_count = ?, starboard_message_id = ?, last_updated = ?'
+      : 'star_count = ?, last_updated = ?';
+    
+    const values = starboardMessageId 
+      ? [starCount, starboardMessageId, Date.now(), originalMessageId]
+      : [starCount, Date.now(), originalMessageId];
+
+    db.run(
+      `UPDATE starboard_messages SET ${updateFields} WHERE original_message_id = ?`,
+      values,
+      (err: any) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
 // EU please for the love of god dont burn my house down for collecting too much user data pweease i swear ill abide by the GDPR >.<
 export {
   getGuildStats,
@@ -679,4 +762,9 @@ export {
   createDownloadRecord,
   getDownloadRecord,
   cleanupExpiredDownloads,
+  getStarboardSettings,
+  setStarboardSettings,
+  getStarboardMessage,
+  createStarboardMessage,
+  updateStarboardMessage,
 };
