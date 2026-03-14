@@ -1,0 +1,369 @@
+import os
+import discord
+from discord.ext import commands
+from discord import app_commands
+import subprocess
+import asyncio
+import sys
+from typing import Optional
+import pkg_resources
+import hashlib
+
+class Update(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self.repo_url = "https://github.com/ilikepancakes-ink/gork.git"
+        self.requirements_file = "requirements.txt"
+        
+    async def run_command(self, command: str, cwd: Optional[str] = None) -> tuple[str, str, int]:
+        """Run a shell command asynchronously and return stdout, stderr, and return code"""
+        try:
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=cwd
+            )
+            stdout, stderr = await process.communicate()
+            return stdout.decode(), stderr.decode(), process.returncode
+        except Exception as e:
+            return "", str(e), 1
+
+    async def check_requirements_changes(self) -> tuple[bool, str]:
+        """Check if requirements.txt has changed and return the hash comparison"""
+        try:
+            if not os.path.exists(self.requirements_file):
+                return False, "requirements.txt not found"
+
+            
+            with open(self.requirements_file, 'r', encoding='utf-8') as f:
+                current_content = f.read().strip()
+
+            
+            current_hash = hashlib.md5(current_content.encode()).hexdigest()
+
+            
+            hash_file = ".requirements_hash"
+            previous_hash = None
+
+            if os.path.exists(hash_file):
+                with open(hash_file, 'r') as f:
+                    previous_hash = f.read().strip()
+
+            
+            with open(hash_file, 'w') as f:
+                f.write(current_hash)
+
+            if previous_hash is None:
+                return True, "First time checking requirements - will install dependencies"
+            elif current_hash != previous_hash:
+                return True, "requirements.txt has changed - new dependencies may be needed"
+            else:
+                return False, "requirements.txt unchanged"
+
+        except Exception as e:
+            return False, f"Error checking requirements: {str(e)}"
+
+    async def install_requirements(self) -> tuple[bool, str]:
+        """Install or upgrade packages from requirements.txt"""
+        try:
+            if not os.path.exists(self.requirements_file):
+                return False, "requirements.txt not found"
+
+            
+            stdout, stderr, code = await self.run_command(
+                f"{sys.executable} -m pip install -r {self.requirements_file} --upgrade"
+            )
+
+            if code == 0:
+                return True, f"Successfully installed/upgraded packages:\n{stdout}"
+            else:
+                return False, f"Failed to install packages:\n{stderr}"
+
+        except Exception as e:
+            return False, f"Error installing requirements: {str(e)}"
+
+    async def check_missing_packages(self) -> tuple[bool, str, list]:
+        """Check for missing packages from requirements.txt"""
+        try:
+            if not os.path.exists(self.requirements_file):
+                return False, "requirements.txt not found", []
+
+            missing_packages = []
+            installed_packages = {pkg.project_name.lower(): pkg.version for pkg in pkg_resources.working_set}
+
+            with open(self.requirements_file, 'r', encoding='utf-8') as f:
+                requirements = f.readlines()
+
+            for req in requirements:
+                req = req.strip()
+                if not req or req.startswith('#'):
+                    continue
+
+
+                package_name = req.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].split('!')[0].strip()
+
+                if package_name.lower() not in installed_packages:
+                    missing_packages.append(package_name)
+
+            if missing_packages:
+                return True, f"Missing packages: {', '.join(missing_packages)}", missing_packages
+            else:
+                return False, "All required packages are installed", []
+
+        except Exception as e:
+            return False, f"Error checking packages: {str(e)}", []
+
+    async def git_pull(self) -> tuple[bool, str]:
+        """Pull latest changes from the git repository"""
+        try:
+            
+            stdout, stderr, code = await self.run_command("git status")
+            if code != 0:
+                return False, "Not in a git repository or git not available"
+            
+            
+            stdout, stderr, code = await self.run_command("git remote get-url origin")
+            if code != 0:
+                
+                stdout, stderr, code = await self.run_command(f"git remote add origin {self.repo_url}")
+                if code != 0:
+                    return False, f"Failed to add remote: {stderr}"
+            
+            
+            stdout, stderr, code = await self.run_command("git fetch origin")
+            if code != 0:
+                return False, f"Failed to fetch: {stderr}"
+            
+            
+            stdout, stderr, code = await self.run_command("git pull origin main")
+            if code != 0:
+                return False, f"Failed to pull: {stderr}"
+            
+            return True, stdout
+            
+        except Exception as e:
+            return False, f"Git operation failed: {str(e)}"
+
+    async def reload_cogs(self) -> tuple[bool, str]:
+        """Reload all cogs"""
+        try:
+            results = []
+            failed_cogs = []
+
+            
+            loaded_cogs = list(self.bot.cogs.keys())
+
+            
+            cog_file_mapping = {
+                'MessageLogger': 'message_logger',
+                'Gork': 'gork',
+                'Status': 'status',
+                'Weather': 'weather',
+                'HwInfo': 'hwinfo',
+                'Update': 'update',
+                'SteamUserTool': 'steam_tool'
+            }
+
+            
+            cogs_dir = "cogs"
+            available_cog_files = []
+            if os.path.exists(cogs_dir):
+                available_cog_files = [f[:-3] for f in os.listdir(cogs_dir)
+                                     if f.endswith('.py') and not f.startswith('__')]
+
+            
+            for cog_name in loaded_cogs:
+                try:
+                    
+                    if cog_name.lower() == 'update':
+                        continue
+
+                    
+                    file_name = cog_file_mapping.get(cog_name, cog_name.lower())
+                    extension_name = f"cogs.{file_name}"
+
+                    
+                    if file_name not in available_cog_files:
+                        failed_cogs.append(f"❌ Cog file not found for {cog_name}: {file_name}.py")
+                        continue
+
+                    
+                    await self.bot.reload_extension(extension_name)
+                    results.append(f"✅ Reloaded {cog_name}")
+
+                except Exception as e:
+                    failed_cogs.append(f"❌ Failed to reload {cog_name}: {str(e)}")
+
+            
+            if available_cog_files:
+                
+                file_to_cog_mapping = {v: k for k, v in cog_file_mapping.items()}
+
+                for file_name in available_cog_files:
+                    extension_name = f"cogs.{file_name}"
+
+                    
+                    expected_cog_name = file_to_cog_mapping.get(file_name, file_name.title().replace('_', ''))
+
+                    
+                    if file_name.lower() == 'update' or expected_cog_name in loaded_cogs:
+                        continue
+
+                    try:
+                        await self.bot.load_extension(extension_name)
+                        results.append(f"✅ Loaded new cog: {expected_cog_name}")
+                    except Exception as e:
+                        
+                        if "already loaded" in str(e).lower():
+                            results.append(f"ℹ️ Cog {file_name} already loaded")
+                        else:
+                            failed_cogs.append(f"❌ Failed to load new cog {file_name}: {str(e)}")
+
+            
+            try:
+                await self.bot.tree.sync()
+                results.append("✅ Synced slash commands")
+            except Exception as e:
+                failed_cogs.append(f"❌ Failed to sync commands: {str(e)}")
+
+            success_msg = "\n".join(results) if results else "No cogs to reload"
+            error_msg = "\n".join(failed_cogs) if failed_cogs else ""
+
+            full_msg = success_msg
+            if error_msg:
+                full_msg += f"\n\n**Errors:**\n{error_msg}"
+
+            return len(failed_cogs) == 0, full_msg
+
+        except Exception as e:
+            return False, f"Reload operation failed: {str(e)}"
+
+    @app_commands.command(name="debug", description="Debug commands for bot maintenance")
+    @app_commands.describe(action="Action to perform: update")
+    async def debug(self, interaction: discord.Interaction, action: str):
+        """Debug command for bot maintenance"""
+        
+        
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ You need administrator permissions to use debug commands.", ephemeral=True)
+            return
+        
+        if action.lower() != "update":
+            await interaction.response.send_message("❌ Invalid action. Use `update` to pull from git and reload cogs.", ephemeral=True)
+            return
+        
+        await interaction.response.defer()
+        
+        embed = discord.Embed(
+            title="🔄 Debug Update",
+            description="Starting update process...",
+            color=discord.Color.blue()
+        )
+        await interaction.followup.send(embed=embed)
+        
+        
+        embed.add_field(name="📥 Git Pull", value="Pulling latest changes...", inline=False)
+        await interaction.edit_original_response(embed=embed)
+
+        git_success, git_message = await self.git_pull()
+
+        if git_success:
+            embed.set_field_at(0, name="📥 Git Pull", value=f"✅ Success\n```\n{git_message[:500]}{'...' if len(git_message) > 500 else ''}\n```", inline=False)
+        else:
+            embed.set_field_at(0, name="📥 Git Pull", value=f"❌ Failed\n```\n{git_message[:500]}{'...' if len(git_message) > 500 else ''}\n```", inline=False)
+            embed.color = discord.Color.red()
+            await interaction.edit_original_response(embed=embed)
+            return
+
+        
+        embed.add_field(name="📦 Check Dependencies", value="Checking for new pip packages...", inline=False)
+        await interaction.edit_original_response(embed=embed)
+
+        deps_changed, deps_message = await self.check_requirements_changes()
+        has_missing, missing_message, missing_list = await self.check_missing_packages()
+
+        if deps_changed or has_missing:
+            embed.set_field_at(1, name="📦 Check Dependencies", value=f"⚠️ Changes detected\n```\n{deps_message}\n{missing_message}\n```", inline=False)
+
+            
+            embed.add_field(name="⬇️ Install Dependencies", value="Installing/upgrading pip packages...", inline=False)
+            await interaction.edit_original_response(embed=embed)
+
+            install_success, install_message = await self.install_requirements()
+
+            if install_success:
+                embed.set_field_at(2, name="⬇️ Install Dependencies", value=f"✅ Success\n```\n{install_message[:600]}{'...' if len(install_message) > 600 else ''}\n```", inline=False)
+            else:
+                embed.set_field_at(2, name="⬇️ Install Dependencies", value=f"❌ Failed\n```\n{install_message[:600]}{'...' if len(install_message) > 600 else ''}\n```", inline=False)
+                embed.color = discord.Color.red()
+                await interaction.edit_original_response(embed=embed)
+                return
+        else:
+            embed.set_field_at(1, name="📦 Check Dependencies", value=f"✅ No changes\n```\n{deps_message}\n{missing_message}\n```", inline=False)
+        
+        
+        cog_field_index = 3 if (deps_changed or has_missing) else 2
+        embed.add_field(name="🔄 Reload Cogs", value="Reloading all cogs...", inline=False)
+        await interaction.edit_original_response(embed=embed)
+
+        reload_success, reload_message = await self.reload_cogs()
+
+        if reload_success:
+            embed.set_field_at(cog_field_index, name="🔄 Reload Cogs", value=f"✅ Success\n```\n{reload_message[:800]}{'...' if len(reload_message) > 800 else ''}\n```", inline=False)
+            embed.color = discord.Color.green()
+            embed.description = "✅ Update completed successfully!"
+        else:
+            embed.set_field_at(cog_field_index, name="🔄 Reload Cogs", value=f"⚠️ Partial Success\n```\n{reload_message[:800]}{'...' if len(reload_message) > 800 else ''}\n```", inline=False)
+            embed.color = discord.Color.orange()
+            embed.description = "⚠️ Update completed with some issues"
+        
+        await interaction.edit_original_response(embed=embed)
+
+    @app_commands.command(name="check-deps", description="Check for missing pip packages from requirements.txt")
+    async def check_deps(self, interaction: discord.Interaction):
+        """Check for missing dependencies without updating"""
+
+        
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ You need administrator permissions to use this command.", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+
+        embed = discord.Embed(
+            title="📦 Dependency Check",
+            description="Checking for missing pip packages...",
+            color=discord.Color.blue()
+        )
+        await interaction.followup.send(embed=embed)
+
+        
+        has_missing, missing_message, missing_list = await self.check_missing_packages()
+
+        if has_missing:
+            embed.add_field(
+                name="⚠️ Missing Packages",
+                value=f"```\n{missing_message}\n```",
+                inline=False
+            )
+            embed.add_field(
+                name="💡 Solution",
+                value="Run `/debug update` to install missing packages automatically.",
+                inline=False
+            )
+            embed.color = discord.Color.orange()
+            embed.description = "⚠️ Some packages are missing"
+        else:
+            embed.add_field(
+                name="✅ All Good",
+                value=f"```\n{missing_message}\n```",
+                inline=False
+            )
+            embed.color = discord.Color.green()
+            embed.description = "✅ All required packages are installed"
+
+        await interaction.edit_original_response(embed=embed)
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Update(bot))

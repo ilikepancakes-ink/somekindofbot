@@ -1,0 +1,205 @@
+[33mcommit 0400c4972afe9f7ddbafca6b0947a082b3ef1429[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Wed Mar 11 23:51:01 2026 +0100
+
+    fix: Add null safety checks and type guards for Discord.js interactions
+    
+    - Added null safety checks for BOT_ADMIN_USER_ID environment variable
+    - Added type guards for interaction.isChatInputCommand() and interaction.isAutocomplete()
+    - Enhanced permission validation with proper type checking
+    - Improved error handling for different interaction types
+    - Added missing imports for AutocompleteInteraction and ChatInputCommandInteraction
+
+[33mcommit bc80679b8d1f73a9258071fa769c0334616d31bb[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Wed Mar 11 23:38:47 2026 +0100
+
+    feat: enhance bot security and moderation permissions
+    
+    - Added bot admin override for all moderation commands
+    - Implemented rate limiting for authentication attempts
+    - Enhanced permission checking with proper admin bypass
+    - Fixed command loading to handle both CommonJS and ESM exports
+    - Added security headers and improved error handling
+    - Updated environment variable validation and logging
+
+[33mcommit 1e71e2fbfdc46ff2137890cb430599391a5dd8c5[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Wed Mar 11 00:47:35 2026 +0100
+
+    Add logtodm command to send confession logs to users via DM
+
+[33mcommit 945b82603a9b9ff5bee1ef4d76c0abefad814b2f[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Sun Mar 8 00:51:48 2026 +0100
+
+    feat: Implement user ban logic for specific ID in GuildMemberAdd event
+
+[33mcommit c17e05cf15ce2fe752732c662fbe67d7be3736da[m
+Author: [ilikepancakes@ilikepancakes.ink ~]$ <webmaster@ilikepancakes.ink>
+Date:   Tue Feb 17 22:28:00 2026 +0100
+
+    Delete webhook-shi directory
+
+[33mcommit 9ab7d45bcbf1fd8143f4ba456d9ada2161c332e2[m
+Author: [ilikepancakes@ilikepancakes.ink ~]$ <webmaster@ilikepancakes.ink>
+Date:   Tue Feb 17 22:27:30 2026 +0100
+
+    Delete webhook shi directory
+
+[33mcommit 6f3c9fd7683cc8e90e3ee56b19ab9e204f6355a0[m
+Author: vel <webmaster@ilikepancakes.ink>
+Date:   Tue Feb 17 02:03:08 2026 +0100
+
+    fix: Add null checks for confession channel retrieval
+    
+    Added null checks when retrieving confession channels to prevent runtime errors when the channel ID is undefined or the channel doesn't exist in the cache. This ensures the bot handles missing configuration gracefully without crashing.
+
+[33mcommit ea8116cbea1f1716fcd758dc810a5918b7b9adb1[m
+Author: vel <webmaster@ilikepancakes.ink>
+Date:   Tue Feb 17 02:00:35 2026 +0100
+
+    refactor: consolidate confession command handlers and improve interaction routing
+    
+    Moved confession-related button interactions, modal submissions, and message handling into dedicated handlers within the confessions command module. This improves code organization and makes the interaction routing in events/interactionCreate.ts and events/messageCreate.ts more maintainable.
+
+[33mcommit d5afa5975eb850cdb1af84d40565b2d752746b7c[m
+Author: vel <webmaster@ilikepancakes.ink>
+Date:   Thu Feb 12 01:55:53 2026 +0100
+
+    chore: add webhook-shi to deploy script
+    
+    Updated the deploy script to include the webhook-shi service alongside the existing bot and website services, ensuring all components start simultaneously during deployment.
+
+[33mcommit b36449f183824ada60fe9c7b0ccc2f3bd2155bcb[m
+Author: vel <webmaster@ilikepancakes.ink>
+Date:   Thu Feb 12 01:30:37 2026 +0100
+
+    created a /review command to make safe code reviewing easy and possible!
+
+[33mcommit b3ea5fa714b38af74ea7e53e349f4b99b816b463[m
+Merge: d7a3fba 0fe925c
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Thu Feb 12 01:21:11 2026 +0100
+
+    Merge branch 'main' of https://github.com/ilikepancakes-ink/somekindofbot
+
+[33mcommit d7a3fbaac8d7f410f9fcd1a38c0a20a396c02596[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Thu Feb 12 01:21:06 2026 +0100
+
+    ja
+
+[33mcommit 0fe925c04a6a14a1df92468763d6d0cb788c762e[m
+Author: vel <webmaster@ilikepancakes.ink>
+Date:   Sat Feb 7 03:00:47 2026 +0100
+
+    refactor(download): streamline video download process and remove ytdl-core dependency
+
+[33mcommit 869e471c2904cc2085c0fffe9484943612f65370[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Wed Feb 4 11:27:56 2026 +0100
+
+    fix(role): simplify description for role selection embed creation
+
+[33mcommit 386fb585608d4cdb4c6906dd7b749d6cd723f5a4[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Wed Feb 4 01:09:25 2026 +0100
+
+    fix: correct timezone from Paris to Amsterdam for CET display
+    
+    Updates the timezone configuration in timeout and mute commands from Europe/Paris to Europe/Amsterdam to ensure accurate CET time display for moderation actions.
+
+[33mcommit 49939e360a0cb118c658d94b333648d7a13b8bbc[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Tue Feb 3 13:10:07 2026 +0100
+
+    feat(moderation): enhance user notifications for ban, kick, timeout, and warn actions
+
+[33mcommit 226707941fd4d8c83e6787bad0b8cbcd0a222092[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Tue Feb 3 01:30:56 2026 +0100
+
+    feat: load environment variables and enhance permission checks for moderation commands
+
+[33mcommit 4df8bf2e44f33c851d33611426cb5373e419a714[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Tue Feb 3 01:21:01 2026 +0100
+
+    fix(moderation): ensure category subcommand is required for channel management
+
+[33mcommit 138ffe4654302a9c50e4bbdcfbb78a630b2a7f96[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Tue Feb 3 01:17:21 2026 +0100
+
+    feat(moderation): implement channel management commands in a new file
+
+[33mcommit d3a2ce466c757c79433e897720b98d4b11959e44[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Mon Feb 2 13:23:30 2026 +0100
+
+    feat(moderation): add channel and category management commands
+
+[33mcommit 246d05388d07ce421d144b797d32328cd2588083[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Mon Feb 2 12:25:03 2026 +0100
+
+    fuck you i deleted your comments >:3
+
+[33mcommit b99ca5e27ed7d3b7237a5e15a2b70dc39366ec42[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Mon Feb 2 02:34:15 2026 +0100
+
+    feat(user): enhance user command with detailed presence and activity information
+
+[33mcommit 851b129ce8842703b91266e95f45b93ac81075f8[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Mon Feb 2 00:44:22 2026 +0100
+
+    fix(user): set default user status to 'Offline'
+
+[33mcommit da8a3cb416a10a4bf826ecc84e9946a6d38abd83[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Mon Feb 2 00:39:05 2026 +0100
+
+    revert bc i fucked up
+
+[33mcommit e107c2b765d60eae86379ad9ad82d40f96b42a74[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Mon Feb 2 00:35:02 2026 +0100
+
+    Reapply "feat(user): update user command to improve presence and activity display"
+    
+    This reverts commit a49738d436c7c0f0f1012794b3a2a524a7c456b8.
+
+[33mcommit a49738d436c7c0f0f1012794b3a2a524a7c456b8[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Mon Feb 2 00:33:25 2026 +0100
+
+    Revert "feat(user): update user command to improve presence and activity display"
+    
+    This reverts commit bd27a7fa7125b57e70ffb9f63b34bb949728f13f.
+
+[33mcommit 6b4339146c33298147e90c2fd87c299c6210e1f6[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Sat Jan 31 05:23:41 2026 +0100
+
+    feat(moderation): enhance 'profile' command with detailed user information and blacklist status check
+
+[33mcommit b12fd26d39714af847cdfcd9cc2db99bab985986[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Sat Jan 31 04:13:03 2026 +0100
+
+    feat(moderation): enhance 'profile' command to include blacklist status check
+
+[33mcommit bd27a7fa7125b57e70ffb9f63b34bb949728f13f[m
+Author: Vel <webmaster@ilikepancakes.ink>
+Date:   Sat Jan 31 04:01:17 2026 +0100
+
+    feat(user): update user command to improve presence and activity display
+
+[33mcommit 0397086a888227b60ef6e2327dd0d27a8989ae67[m
+Author: vel <webmaster@ilikepancakes.ink>
+Date:   Tue Jan 27 16:44:52 2026 +0100
+
+    feat(download): implement download command for YouTube videos with
