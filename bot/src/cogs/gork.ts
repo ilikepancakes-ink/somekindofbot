@@ -878,9 +878,10 @@ export class Gork {
 
     } catch (e) {
       // Trigger breakpoint for major errors
+      const errorObj = e instanceof Error ? e : new Error(String(e));
       this.check_breakpoints('error', {
         error: String(e),
-        stack: e.stack,
+        stack: errorObj.stack,
         message_id,
         user_id: message.author.id,
         channel_id: message.channel.id
