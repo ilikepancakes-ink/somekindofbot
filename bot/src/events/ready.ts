@@ -1,66 +1,24 @@
-import { Events } from 'discord.js';
-import * as path from 'path';
-const { getAllGuildStats } = require(path.join(__dirname, '../database'));
+import { Client, Events, GuildMember } from 'discord.js';
+import { AutoModerationEvent } from './autoModeration';
 
-module.exports = {
+export default {
   name: Events.ClientReady,
   once: true,
-  execute(client: any) {
-    console.log(`Ready! Logged in as ${client.user.tag}`);
+  async execute(client: Client) {
+    console.log(`Ready! Logged in as ${client.user?.tag}`);
 
-    // Update stats channels every 1.5 minutes
-    setInterval(async () => {
-      try {
-        const allStats = await getAllGuildStats();
-        for (const stats of allStats) {
-          const guild = client.guilds.cache.get(stats.guild_id);
-          if (!guild) continue;
+    // Initialize auto moderation event handler
+    const autoModerationEvent = new AutoModerationEvent();
+    await autoModerationEvent.init();
 
-          // Calculate current stats
-          const memberCount = guild.memberCount;
-          const daysSince = Math.floor((Date.now() - guild.createdTimestamp) / (1000 * 60 * 60 * 24));
-          const roleCount = guild.roles.cache.size;
-          const channelCount = guild.channels.cache.size;
+    // Set up message create event listener
+    client.on(Events.MessageCreate, async (message) => {
+      await autoModerationEvent.handleMessageCreate(message);
+    });
 
-          // Update Members channel
-          if (stats.member_channel_id) {
-            const channel = guild.channels.cache.get(stats.member_channel_id);
-            if (channel) {
-              await channel.setName(`Members: ${memberCount}`);
-              await channel.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
-            }
-          }
-
-          // Update Days channel
-          if (stats.days_channel_id) {
-            const channel = guild.channels.cache.get(stats.days_channel_id);
-            if (channel) {
-              await channel.setName(`Days: ${daysSince}`);
-              await channel.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
-            }
-          }
-
-          // Update Roles channel
-          if (stats.roles_channel_id) {
-            const channel = guild.channels.cache.get(stats.roles_channel_id);
-            if (channel) {
-              await channel.setName(`Roles: ${roleCount}`);
-              await channel.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
-            }
-          }
-
-          // Update Channels channel
-          if (stats.channels_channel_id) {
-            const channel = guild.channels.cache.get(stats.channels_channel_id);
-            if (channel) {
-              await channel.setName(`Channels: ${channelCount}`);
-              await channel.permissionOverwrites.set([{ id: guild.id, deny: ['Connect'] }]);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error updating stats channels:', error);
-      }
-    }, 90000); // 1.5 minutes
+    // Set up member update event listener
+    client.on(Events.GuildMemberUpdate, async (oldMember: GuildMember | any, newMember: GuildMember) => {
+      await autoModerationEvent.handleMemberUpdate(oldMember, newMember);
+    });
   },
 };

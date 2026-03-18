@@ -880,7 +880,7 @@ export class Gork {
       // Trigger breakpoint for major errors
       this.check_breakpoints('error', {
         error: String(e),
-        stack: e.stack,
+        stack: (e as Error).stack,
         message_id,
         user_id: message.author.id,
         channel_id: message.channel.id
