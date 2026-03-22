@@ -19,30 +19,6 @@ export async function execute(interaction: CommandInteraction) {
   const message = interaction.options.getString('message', true);
   console.log(`[Gork Command] User message: ${message}`);
   
-  // Create a mock message object for Gork to process
-  const mockMessage = {
-    ...interaction,
-    content: message,
-    author: interaction.user,
-    channel: interaction.channel,
-    mentions: {
-      users: new Map(),
-      has: (user: any) => false
-    },
-    reference: null,
-    attachments: new Map(),
-    reply: async (content: any) => {
-      console.log(`[Gork Command] Sending reply: ${typeof content === 'string' ? content.substring(0, 100) : 'embed'}`);
-      if (typeof content === 'string') {
-        return await interaction.reply(content);
-      } else if (content.embeds) {
-        return await interaction.reply({ embeds: [content.embeds] });
-      } else {
-        return await interaction.reply(content);
-      }
-    }
-  };
-
   try {
     // Get the Gork instance from the client
     const gork = (interaction.client as any).gork;
@@ -59,6 +35,73 @@ export async function execute(interaction: CommandInteraction) {
     }
 
     console.log(`[Gork Command] Calling gork.on_message()`);
+    
+    // Create a proper mock message object that matches Discord.js Message interface
+    const mockMessage = {
+      id: interaction.id,
+      content: message,
+      author: interaction.user,
+      channel: interaction.channel,
+      guild: interaction.guild,
+      attachments: new Map(),
+      embeds: [],
+      mentions: {
+        users: new Map(),
+        has: (user: any) => false,
+        everyone: false,
+        roles: new Map()
+      },
+      reference: null,
+      createdTimestamp: Date.now(),
+      editedTimestamp: null,
+      type: 'DEFAULT',
+      system: false,
+      pinned: false,
+      tts: false,
+      nonce: null,
+      webhookId: null,
+      activity: null,
+      applicationId: null,
+      flags: 0,
+      stickers: new Map(),
+      components: [],
+      cleanContent: message,
+      member: interaction.member,
+      reactions: new Map(),
+      url: `https://discord.com/channels/${interaction.guildId}/${interaction.channelId}/${interaction.id}`,
+      
+      // Methods
+      reply: async (content: any) => {
+        console.log(`[Gork Command] Sending reply: ${typeof content === 'string' ? content.substring(0, 100) : 'embed'}`);
+        if (typeof content === 'string') {
+          return await interaction.reply(content);
+        } else if (content.embeds) {
+          return await interaction.reply({ embeds: [content.embeds] });
+        } else {
+          return await interaction.reply(content);
+        }
+      },
+      
+      delete: async () => {
+        // No-op for slash command context
+        return;
+      },
+      
+      edit: async (content: any) => {
+        // No-op for slash command context
+        return;
+      },
+      
+      react: async (emoji: any) => {
+        // No-op for slash command context
+        return;
+      },
+      
+      fetch: async () => {
+        return mockMessage;
+      }
+    };
+
     // Process the message through Gork
     await gork.on_message(mockMessage as any);
     console.log(`[Gork Command] Gork processing completed successfully`);

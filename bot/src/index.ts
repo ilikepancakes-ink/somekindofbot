@@ -5,7 +5,7 @@ import { config } from 'dotenv';
 
 config();
 
-import { Gork } from './cogs/gork_fixed';
+import { Gork } from './cogs/gork';
 
 import './server';
 

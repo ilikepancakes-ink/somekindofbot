@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import * as path from 'path';
-const { createRoleEmbed } = require(path.join(__dirname, '../../database'));
+import { MessageDatabase } from '../../utils/database';
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -153,9 +153,81 @@ module.exports = {
     if (!interaction.guild) {
       return await interaction.reply({ content: 'This command can only be used in a server.', flags: 64 });
     }
-    const subcommandGroup = interaction.options.getSubcommandGroup();
+    const subcommandGroup = interaction.options.getSubcommandGroup(false);
     const subcommand = interaction.options.getSubcommand();
 
+    // Handle subcommand groups first
+    if (subcommandGroup === 'embed') {
+      if (subcommand === 'create') {
+        const title = interaction.options.getString('title');
+        const text = interaction.options.getString('text');
+
+        // Collect all provided roles
+        const roles = [];
+        for (let i = 1; i <= 10; i++) {
+          const role = interaction.options.getRole(`role${i}`);
+          if (role) roles.push(role);
+        }
+
+        if (roles.length === 0) {
+          return await interaction.reply({ content: 'At least one role must be provided.', flags: 64 });
+        }
+
+        try {
+          // Create the embed
+          const embed = new EmbedBuilder()
+            .setTitle(title)
+            .setDescription(text)
+            .setColor(0x0099FF)
+            .setTimestamp();
+
+          // Create buttons for each role
+          const components = [];
+          let currentRow = new ActionRowBuilder<ButtonBuilder>();
+
+          for (let i = 0; i < roles.length; i++) {
+            const role = roles[i];
+            const button = new ButtonBuilder()
+              .setCustomId(`role_select_${role.id}`)
+              .setLabel(role.name)
+              .setStyle(ButtonStyle.Primary);
+
+            currentRow.addComponents(button);
+
+            // Discord allows max 5 buttons per row
+            if (currentRow.components.length === 5 || i === roles.length - 1) {
+              components.push(currentRow);
+              currentRow = new ActionRowBuilder<ButtonBuilder>();
+            }
+          }
+
+          // Send the message
+          const message = await interaction.reply({
+            embeds: [embed],
+            components: components,
+            fetchReply: true
+          });
+
+          // Save to database
+          const db = new MessageDatabase();
+          await db.create_role_embed({
+            guild_id: interaction.guild.id,
+            channel_id: interaction.channel.id,
+            message_id: message.id,
+            title: title,
+            description: text,
+            roles: JSON.stringify(roles.map(r => r.id))
+          });
+
+        } catch (error) {
+          console.error(error);
+          await interaction.followUp({ content: 'Failed to create the role selection embed.', flags: 64 });
+        }
+      }
+      return; // Stop execution after handling subcommand group
+    }
+
+    // Handle regular subcommands
     if (subcommand === 'create') {
       const name = interaction.options.getString('name');
       const color = interaction.options.getString('color');
@@ -264,70 +336,6 @@ module.exports = {
       };
 
       await interaction.reply({ embeds: [embed] });
-    } else if (subcommandGroup === 'embed' && subcommand === 'create') {
-      const title = interaction.options.getString('title');
-      const text = interaction.options.getString('text');
-
-      // Collect all provided roles
-      const roles = [];
-      for (let i = 1; i <= 10; i++) {
-        const role = interaction.options.getRole(`role${i}`);
-        if (role) roles.push(role);
-      }
-
-      if (roles.length === 0) {
-        return await interaction.reply({ content: 'At least one role must be provided.', flags: 64 });
-      }
-
-      try {
-        // Create the embed
-        const embed = new EmbedBuilder()
-          .setTitle(title)
-          .setDescription(text)
-          .setColor(0x0099FF)
-          .setTimestamp();
-
-        // Create buttons for each role
-        const components = [];
-        let currentRow = new ActionRowBuilder<ButtonBuilder>();
-
-        for (let i = 0; i < roles.length; i++) {
-          const role = roles[i];
-          const button = new ButtonBuilder()
-            .setCustomId(`role_select_${role.id}`)
-            .setLabel(role.name)
-            .setStyle(ButtonStyle.Primary);
-
-          currentRow.addComponents(button);
-
-          // Discord allows max 5 buttons per row
-          if (currentRow.components.length === 5 || i === roles.length - 1) {
-            components.push(currentRow);
-            currentRow = new ActionRowBuilder<ButtonBuilder>();
-          }
-        }
-
-        // Send the message
-        const message = await interaction.reply({
-          embeds: [embed],
-          components: components,
-          fetchReply: true
-        });
-
-        // Save to database
-        await createRoleEmbed({
-          guild_id: interaction.guild.id,
-          channel_id: interaction.channel.id,
-          message_id: message.id,
-          title: title,
-          description: text,
-          roles: JSON.stringify(roles.map(r => r.id))
-        });
-
-      } catch (error) {
-        console.error(error);
-        await interaction.reply({ content: 'Failed to create the role selection embed.', flags: 64 });
-      }
     }
   },
 };

@@ -28,6 +28,7 @@
     "express": "^4.18.2",
     "oauth-1.0a": "^2.2.6",
     "sqlite3": "^5.1.7",
+    "stack-trace": "^0.0.10",
     "systeminformation": "^5.30.3",
     "ytdl-core": "^4.11.5"
   },

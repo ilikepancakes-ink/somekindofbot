@@ -698,10 +698,11 @@ export class Gork {
     const is_dm = message.channel.type === ChannelType.DM;
     const is_mentioned = this.client.user && message.mentions.users.has(this.client.user.id);
     const contains_at_gork = message.content.toLowerCase().includes('@gork');
+    const is_slash_command = (message as any).isChatInputCommand && (message as any).isChatInputCommand();
 
-    console.log(`[Gork] is_dm: ${is_dm}, is_mentioned: ${is_mentioned}, contains_at_gork: ${contains_at_gork}`);
+    console.log(`[Gork] is_dm: ${is_dm}, is_mentioned: ${is_mentioned}, contains_at_gork: ${contains_at_gork}, is_slash_command: ${is_slash_command}`);
 
-    if (!is_mentioned && !is_dm && !contains_at_gork) {
+    if (!is_mentioned && !is_dm && !contains_at_gork && !is_slash_command) {
       console.log(`[Gork] Message doesn't meet criteria, ignoring`);
       return;
     }
