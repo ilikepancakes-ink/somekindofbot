@@ -5,6 +5,8 @@ import { config } from 'dotenv';
 
 config();
 
+import { Gork } from './cogs/gork';
+
 import './server';
 
 const client = new Client({
@@ -91,6 +93,10 @@ async function main() {
         client.on(event.name, (...args) => event.execute(...args));
       }
     }
+
+    // Initialize Gork cog
+    const gork = new Gork(client);
+    (client as any).gork = gork;
 
     await client.login(process.env.DISCORD_TOKEN);
     console.log('Bot logged in successfully!');
